@@ -1,0 +1,17 @@
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+Pods/
+*.xcworkspace/xcuserdata/
+
+*.ipa
+*.dSYM.zip
+*.dSYM
+build/
+
+.swiftpm/
+.build/
+
+VoiceAgent/Secrets.plist
