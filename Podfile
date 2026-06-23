@@ -5,7 +5,14 @@ target 'VoiceAgent' do
   use_frameworks!
 
   # Pods for VoiceAgent
-  pod 'agent-client-toolkit-swift', '1.0.0'
+  # Local development: use the toolkit source from this repository.
+  pod 'AgoraAgentClientToolkit', :path => './AgoraAgentClientToolkit'
+
+  # Published pod verification: comment the local path pod above, then
+  # uncomment this line after AgoraAgentClientToolkit 1.0.0 is available in
+  # the CocoaPods specs repo used by your Podfile.
+  # pod 'AgoraAgentClientToolkit', '1.0.0'
+
   pod 'AgoraRtcEngine_iOS', '>= 4.5.1'
   # Use RTM lite version (RtmKit subspec) to avoid aosl.xcframework conflict with RTC SDK
   pod 'AgoraRtm', '>= 2.2.3', :subspecs => ['RtmKit']

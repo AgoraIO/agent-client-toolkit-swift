@@ -1,86 +1,202 @@
-# Conversational AI Quickstart - iOS Swift
+# Agora Conversational AI Toolkit for iOS
 
-## Overview
+A client-side toolkit for adding Agora Conversational AI features to iOS applications already using the Agora RTC and RTM SDKs. It runs alongside your existing RTC/RTM integration and adds transcript rendering, agent state tracking, messaging controls, interrupt handling, and latency/error callbacks.
 
-This sample shows how to integrate Agora Conversational AI into an iOS app for real-time voice conversations with an AI agent.
+## Install
 
-It covers:
+Choose one package manager to integrate `AgoraAgentClientToolkit`. Do not integrate the same component through CocoaPods and Swift Package Manager at the same time.
 
-- Real-time voice interaction through Agora RTC SDK
-- Messaging and state synchronization through Agora RTM SDK
-- Live transcript rendering for user and agent messages
-- Connection, agent, mute, and transcript state management
-- Automatic flow for channel join, RTM login, agent startup, and view switching
+### CocoaPods
 
-## Use Cases
+```ruby
+target 'YourApp' do
+  use_frameworks!
 
-- AI-powered customer support
-- Voice assistant applications
-- Real-time voice transcription
-- Voice-interactive games
-- Voice-based education and training
+  pod 'AgoraAgentClientToolkit', '1.0.0'
+end
+```
+
+If your project uses a custom or private CocoaPods specs repository, add that source at the top of your `Podfile`.
+
+### Swift Package Manager
+
+In Xcode, use `File > Add Package Dependencies...`, enter the SwiftPM package URL, select version `1.0.0` or later, and add the `AgoraAgentClientToolkit` product to your app target.
+
+If you manage dependencies in `Package.swift`, use:
+
+```swift
+dependencies: [
+    .package(url: "<SwiftPM package URL>/agent-client-toolkit-swift.git", from: "1.0.0")
+]
+```
+
+```swift
+targets: [
+    .target(
+        name: "YourTarget",
+        dependencies: [
+            .product(
+                name: "AgoraAgentClientToolkit",
+                package: "agent-client-toolkit-swift"
+            )
+        ]
+    )
+]
+```
 
 ## Requirements
 
-- iOS 13.0 or later
+- iOS 15.0 or later
 - Xcode 14.0 or later
-- CocoaPods 1.11.0 or later
-- Agora developer account: [Console](https://console.agora.cn/)
+- Agora RTC SDK `4.5.1` or later
+- Agora RTM SDK
 - Real-time Messaging (RTM) enabled in the Agora Console
-- Agora App ID and App Certificate
+
+SwiftPM dependencies:
+
+- `AgoraRtcEngine_iOS` `4.5.1` or later
+- `AgoraRTM_iOS` `2.2.8` or later
+
+CocoaPods dependencies:
+
+- `AgoraRtcEngine_iOS` `4.5.1` or later
+- `AgoraRtm/RtmKit` `2.2.3` or later
+
+`AgoraAgentClientToolkit` declares Agora RTC and RTM as package dependencies. Your app only needs to declare RTC/RTM directly if your own code also imports and calls RTC/RTM APIs.
 
 ## Quick Start
 
-1. Clone the project:
-
-```bash
-git clone https://github.com/AgoraIO-Community/conversational-ai-quickstart-native.git
-cd conversational-ai-quickstart-native/ios-swift
+```swift
+import AgoraRtcKit
+import AgoraRtmKit
+import AgoraAgentClientToolkit
 ```
 
-2. Install CocoaPods dependencies:
+Create the API with your existing RTC and RTM instances:
+
+```swift
+let config = ConversationalAIAPIConfig(
+    rtcEngine: rtcEngine,
+    rtmEngine: rtmEngine,
+    renderMode: .words,
+    enableLog: true
+)
+
+let convoAIAPI = ConversationalAIAPIImpl(config: config)
+convoAIAPI.addHandler(handler: self)
+```
+
+Subscribe after RTM login and before starting the agent session:
+
+```swift
+convoAIAPI.subscribeMessage(channelName: channelName) { error in
+    if let error = error {
+        print("Subscription failed: \(error.message)")
+    }
+}
+```
+
+Apply audio settings before joining the RTC channel:
+
+```swift
+convoAIAPI.loadAudioSettings()
+rtcEngine.joinChannel(byToken: token, channelId: channelName, info: nil, uid: uid)
+```
+
+Handle agent state and transcript updates in your `ConversationalAIAPIEventHandler` implementation:
+
+```swift
+func onAgentStateChanged(agentUserId: String, event: StateChangeEvent) {
+    print("Agent state: \(event.state)")
+}
+
+func onTranscriptUpdated(agentUserId: String, transcript: Transcript) {
+    print("Transcript: \(transcript)")
+}
+```
+
+Send a text message or interrupt the agent:
+
+```swift
+let message = TextMessage(text: "Hello")
+convoAIAPI.chat(agentUserId: agentUserId, message: message) { error in
+    if let error = error {
+        print("Send failed: \(error.message)")
+    }
+}
+
+convoAIAPI.interrupt(agentUserId: agentUserId) { error in
+    if let error = error {
+        print("Interrupt failed: \(error.message)")
+    }
+}
+```
+
+Unsubscribe and release resources when the session ends:
+
+```swift
+convoAIAPI.unsubscribeMessage(channelName: channelName) { _ in }
+convoAIAPI.destroy()
+```
+
+Full API details are in [AgoraAgentClientToolkit/README.md](./AgoraAgentClientToolkit/README.md).
+
+## Example App
+
+This repository includes a UIKit demo app that shows the complete flow: token generation, RTM login, RTC join, agent startup, transcript display, agent state rendering, mute, and stop.
+
+Run the demo:
 
 ```bash
+git clone https://github.com/AgoraIO-Conversational-AI/agent-client-toolkit-swift.git
+cd agent-client-toolkit-swift
 pod install
+open VoiceAgent.xcworkspace
 ```
 
-3. Configure the iOS project:
-
-- Open `VoiceAgent.xcworkspace` in Xcode, not `VoiceAgent.xcodeproj`.
-- Copy the sample secrets file and fill in your Agora credentials:
+Copy the sample secrets file and fill in your Agora credentials:
 
 ```bash
 cp VoiceAgent/Secrets.example.plist VoiceAgent/Secrets.plist
 ```
 
-`VoiceAgent/Secrets.plist` is ignored by Git and must not be committed.
-For CI or internal builds, inject `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE` as Xcode build settings; `VoiceAgent/Info.plist` maps those settings into the app bundle and `KeyCenter` reads them at runtime.
-
 Configuration fields:
 
-- `AGORA_APP_ID`: Your Agora App ID. Required.
-- `AGORA_APP_CERTIFICATE`: Your Agora App Certificate. Required for token generation and REST API authorization.
+- `AGORA_APP_ID`: Your Agora App ID.
+- `AGORA_APP_CERTIFICATE`: Your Agora App Certificate.
 
-The default pipeline uses Agora-managed keyless mode. ASR, LLM, and TTS keys and model selection are managed by Agora and billed to your project, so no third-party keys are required in the client.
+The demo uses Agora-managed keyless mode for ASR, LLM, and TTS model selection, but still requires App ID and App Certificate for token generation and REST API authorization. Production apps should generate tokens and start/stop agents from your own backend instead of calling REST APIs directly from the client.
 
-The managed models are selected by the top-level `preset` field in `ViewController.startAgent()`. The current defaults are:
+Before trying the demo, create an Agora project, enable Conversational AI Engine, and enable RTM. See [Enable the service](https://doc.agora.cn/doc/convoai/restful/get-started/enable-service).
 
-- ASR: `deepgram_nova_3`
-- LLM: `openai_gpt_4o_mini`
-- TTS: `minimax_speech_2_6_turbo`; the `voice_id` is supplied in code, while the preset supplies the key and model.
+## Repository Layout
 
-Before trying the demo, create an Agora project, enable Conversational AI Engine, and get your App ID and App Certificate. See [Enable the service](https://doc.agora.cn/doc/convoai/restful/get-started/enable-service).
+```text
+.
+|-- AgoraAgentClientToolkit/
+|   |-- AgoraAgentClientToolkit.podspec
+|   |-- README.md
+|   `-- AgoraAgentClientToolkit/Classes/
+|-- VoiceAgent/                 # UIKit demo app
+|-- Tests/
+|-- Package.swift
+|-- Podfile
+`-- scripts/
+```
 
-4. Run the app:
+## Development
 
-- Click `Start` to start the voice agent session.
+```bash
+# Demo app dependencies
+pod install
 
-## Notes
+# Validate SwiftPM manifest and build
+scripts/verify_spm.sh
+```
 
-- This demo is intended for quick evaluation and development testing only.
-- Production apps should not call Agora RESTful APIs directly from the client.
-- `AGORA_APP_CERTIFICATE` is bundled in local debug builds and sent to the demo token service in this sample, which is not safe for production.
-- In production, the client should call your own backend. Your backend should generate tokens and call Agora RESTful APIs.
+## Maintainers
+
+For CocoaPods / SwiftPM packaging, see [docs/publishing.md](./docs/publishing.md).
 
 ## Resources
 
@@ -88,5 +204,4 @@ Before trying the demo, create an Agora project, enable Conversational AI Engine
 - [Agora RTM iOS SDK documentation](https://doc.agora.cn/doc/rtm2/ios/landing-page)
 - [Conversational AI RESTful API documentation](https://doc.agora.cn/doc/convoai/restful/landing-page)
 - [Conversational AI iOS client component documentation](https://doc.agora.cn/api-ref/convoai/ios/ios-component/overview)
-- [Agora Developer Community](https://github.com/AgoraIO-Community)
 - [Contact Agora Support](https://ticket.agora.cn/)
