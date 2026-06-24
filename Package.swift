@@ -20,7 +20,7 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "AgoraAgentClientToolkit",
-            path: "sdk/AgoraAgentClientToolkit.xcframework"
+            path: "AgoraAgentClientToolkit.xcframework"
         ),
         .target(
             name: "AgoraAgentClientToolkitDependencies",
