@@ -8,8 +8,10 @@ Current scope:
 
 - Start Agent
 - RTC join + RTM login
+- Startup-time selection for independent SOS / EOS turn detection
 - Real-time transcript rendering
 - Agent status rendering
+- Manual SOS / EOS trigger buttons shown by selected detection modes
 - Mute / unmute
 - Stop Agent and cleanup
 
@@ -24,8 +26,10 @@ Out of scope for this quickstart:
 The page is intentionally single-screen and is organized into these regions:
 
 - debug log panel at the top
+- startup-time turn detection summary and settings button
 - start view before connection
 - transcript list after connection
+- capability panel for manual SOS / EOS actions when enabled
 - agent status view
 - mute / stop controls
 
@@ -40,6 +44,8 @@ ios-swift/
 │   ├── ViewController.swift
 │   ├── KeyCenter.swift
 │   ├── AppColors.swift
+│   ├── ManualTurnDemoUI.swift
+│   ├── TurnDetectionMode.swift
 │   ├── Chat/
 │   │   ├── ConnectionStartView.swift
 │   │   ├── ChatSessionView.swift
@@ -76,7 +82,7 @@ Tap Start Agent
   → subscribe RTM channel
   → generate agentToken
   → generate authToken
-  → POST /join with top-level `preset` (managed ASR / LLM / TTS)
+  → POST /join with explicit ASR / LLM / TTS config and selected `turn_detection`
   → save agentId
   → switch to chat view
 ```
@@ -110,6 +116,24 @@ currentAgentState    → AgentStateView status
 transcripts          → transcript table content
 debug log text       → top log panel
 isMicMuted           → mic button state
+sos/eos detection   → turn detection label + manual capability panel
+```
+
+Turn detection is selected before startup. `SOS` controls
+`properties.turn_detection.config.start_of_speech.mode`; `EOS`
+controls `properties.turn_detection.config.end_of_speech.mode`. Both support
+`vad`, `semantic`, and `manual`. When a selected mode is `manual`, the matching
+SOS or EOS button appears after the connection is established.
+
+Manual button flow:
+
+```text
+Tap SOS / EOS
+  → ConversationalAIAPI.manualSOS(...) / manualEOS(...)
+  → RTM publish with custom type user.manual_sos / user.manual_eos
+  → server result event
+  → ViewController.onUserManualSosEvent(...) / onUserManualEosEvent(...)
+  → debug log update
 ```
 
 ## Token Flow
@@ -152,19 +176,21 @@ KeyCenter.swift
 
 Required fields:
 
-- `AGORA_APP_ID`
-- `AGORA_APP_CERTIFICATE`
+- `APP_ID`
 
 Local credentials should be stored in `VoiceAgent/Secrets.plist`, copied from
 `VoiceAgent/Secrets.example.plist`. The local secrets file is ignored by Git.
 CI or internal builds can inject the same values through Xcode build settings
-named `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`.
+named `APP_ID`, optional `APP_CERTIFICATE`, and `TOOLBOX_SERVER_HOST`.
+`APP_CERTIFICATE` is sent to the demo token service only when configured.
 
-Current default managed preset:
+Default demo ASR / LLM / TTS values are resolved by `KeyCenter.swift`:
 
-- ASR: `deepgram_nova_3`
-- LLM: `openai_gpt_4o_mini`
-- TTS: `minimax_speech_2_6_turbo` (the preset supplies the key + model; only `params.voice_setting.voice_id` is sent under `properties.tts`)
+- Token service: `TOOLBOX_SERVER_HOST`
+- Token certificate: `APP_CERTIFICATE`
+- ASR: `ASR_VENDOR`, `ASR_API_KEY`, `ASR_MODEL`
+- LLM: `LLM_URL`, `LLM_API_KEY`, `LLM_MODEL`
+- TTS: `TTS_VENDOR`, `TTS_KEY`, `TTS_MODEL_ID`, `TTS_VOICE_ID`, `TTS_SAMPLE_RATE`
 
 ## Constraints
 

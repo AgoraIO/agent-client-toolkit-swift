@@ -54,6 +54,8 @@ enum AppColors {
     static let btnStartPressed = UIColor(hex: 0x3B82F6)
     static let btnStopBg = UIColor(hex: 0xDC2626)
     static let btnStopPressed = UIColor(hex: 0xEF4444)
+    static let btnManualBg = UIColor(hex: 0x0F766E)
+    static let btnManualPressed = UIColor(hex: 0x14B8A6)
     static let btnDisabledBg = UIColor(hex: 0x334155)
     static let btnDisabledText = UIColor(hex: 0x94A3B8)
 

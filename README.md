@@ -12,7 +12,7 @@ Choose one package manager to integrate `AgoraAgentClientToolkit`. Do not integr
 target 'YourApp' do
   use_frameworks!
 
-  pod 'AgoraAgentClientToolkit', '1.0.0'
+  pod 'AgoraAgentClientToolkit', '2.9.0'
 end
 ```
 
@@ -20,13 +20,13 @@ If your project uses a custom or private CocoaPods specs repository, add that so
 
 ### Swift Package Manager
 
-In Xcode, use `File > Add Package Dependencies...`, enter the SwiftPM package URL, select version `1.0.0` or later, and add the `AgoraAgentClientToolkit` product to your app target.
+In Xcode, use `File > Add Package Dependencies...`, enter `https://github.com/AgoraIO/agent-client-toolkit-swift.git`, select version `2.9.0` or later, and add the `AgoraAgentClientToolkit` product to your app target.
 
 If you manage dependencies in `Package.swift`, use:
 
 ```swift
 dependencies: [
-    .package(url: "<SwiftPM package URL>/agent-client-toolkit-swift.git", from: "1.0.0")
+    .package(url: "https://github.com/AgoraIO/agent-client-toolkit-swift.git", from: "2.9.0")
 ]
 ```
 
@@ -66,15 +66,13 @@ CocoaPods dependencies:
 
 ## Quick Start
 
+Create the toolkit API with your existing RTC engine and RTM client:
+
 ```swift
 import AgoraRtcKit
 import AgoraRtmKit
 import AgoraAgentClientToolkit
-```
 
-Create the API with your existing RTC and RTM instances:
-
-```swift
 let config = ConversationalAIAPIConfig(
     rtcEngine: rtcEngine,
     rtmEngine: rtmEngine,
@@ -86,113 +84,115 @@ let convoAIAPI = ConversationalAIAPIImpl(config: config)
 convoAIAPI.addHandler(handler: self)
 ```
 
-Subscribe after RTM login and before starting the agent session:
+Register event callbacks:
 
 ```swift
-convoAIAPI.subscribeMessage(channelName: channelName) { error in
-    if let error = error {
-        print("Subscription failed: \(error.message)")
+final class ConversationHandler: NSObject, ConversationalAIAPIEventHandler {
+    func onAgentStateChanged(agentUserId: String, event: StateChangeEvent) {
+        // Render agent state.
+    }
+
+    func onAgentListeningChanged(agentUserId: String, isListening: Bool) {
+        // Handle listening state.
+    }
+
+    func onAgentThinkingChanged(agentUserId: String, isThinking: Bool) {
+        // Handle thinking state.
+    }
+
+    func onAgentSpeakingChanged(agentUserId: String, isSpeaking: Bool) {
+        // Handle speaking state.
+    }
+
+    func onAgentInterrupted(agentUserId: String, event: InterruptEvent) {
+        // Handle interruption.
+    }
+
+    func onAgentMetrics(agentUserId: String, metrics: Metric) {
+        // Observe module latency metrics.
+    }
+
+    func onTurnFinished(agentUserId: String, turn: Turn) {
+        // Observe completed-turn latency.
+    }
+
+    func onAgentError(agentUserId: String, error: ModuleError) {
+        // Handle agent-side errors.
+    }
+
+    func onMessageError(agentUserId: String, error: MessageError) {
+        // Handle message errors.
+    }
+
+    func onMessageReceiptUpdated(agentUserId: String, messageReceipt: MessageReceipt) {
+        // Handle message receipts.
+    }
+
+    func onAgentVoiceprintStateChanged(agentUserId: String, event: VoiceprintStateChangeEvent) {
+        // Handle voiceprint state changes.
+    }
+
+    func onUserManualSosEvent(agentUserId: String, event: UserManualSosEvent) {
+        // Handle manual SOS result.
+    }
+
+    func onUserManualEosEvent(agentUserId: String, event: UserManualEosEvent) {
+        // Handle manual EOS result.
+    }
+
+    func onAgentManualEosEvent(agentUserId: String, event: AgentManualEosEvent) {
+        // Handle automatic EOS in manual mode.
+    }
+
+    func onTranscriptUpdated(agentUserId: String, transcript: Transcript) {
+        // Render user or agent transcript.
+    }
+
+    func onDebugLog(log: String) {
+        // Forward debug logs if needed.
     }
 }
 ```
 
-Apply audio settings before joining the RTC channel:
+Load audio settings before joining RTC, then subscribe to the RTM message channel after RTC/RTM are ready:
 
 ```swift
 convoAIAPI.loadAudioSettings()
 rtcEngine.joinChannel(byToken: token, channelId: channelName, info: nil, uid: uid)
-```
 
-Handle agent state and transcript updates in your `ConversationalAIAPIEventHandler` implementation:
-
-```swift
-func onAgentStateChanged(agentUserId: String, event: StateChangeEvent) {
-    print("Agent state: \(event.state)")
-}
-
-func onTranscriptUpdated(agentUserId: String, transcript: Transcript) {
-    print("Transcript: \(transcript)")
-}
-```
-
-Send a text message or interrupt the agent:
-
-```swift
-let message = TextMessage(text: "Hello")
-convoAIAPI.chat(agentUserId: agentUserId, message: message) { error in
+convoAIAPI.subscribeMessage(channelName: channelName) { error in
     if let error = error {
-        print("Send failed: \(error.message)")
+        // Handle ConversationalAIAPIError.
+        return
     }
-}
 
-convoAIAPI.interrupt(agentUserId: agentUserId) { error in
-    if let error = error {
-        print("Interrupt failed: \(error.message)")
-    }
+    // Start the Conversational AI agent through your app or backend flow.
 }
 ```
 
-Unsubscribe and release resources when the session ends:
+See [AgoraAgentClientToolkit/README.md](./AgoraAgentClientToolkit/README.md) for the full component API guide.
+
+## Manual SOS/EOS
+
+If the agent is started with manual turn detection, use the toolkit to publish
+manual speech markers through RTM:
 
 ```swift
-convoAIAPI.unsubscribeMessage(channelName: channelName) { _ in }
-convoAIAPI.destroy()
+convoAIAPI.manualSOS(agentUserId: agentUserId) { requestId, error in
+    // error is nil when RTM publish succeeds.
+    // requestId is generated by the toolkit and sent as request_id.
+}
+
+convoAIAPI.manualEOS(agentUserId: agentUserId) { requestId, error in
+    // error is nil when RTM publish succeeds.
+    // requestId is generated by the toolkit and sent as request_id.
+}
 ```
 
-Full API details are in [AgoraAgentClientToolkit/README.md](./AgoraAgentClientToolkit/README.md).
-
-## Example App
-
-This repository includes a UIKit demo app that shows the complete flow: token generation, RTM login, RTC join, agent startup, transcript display, agent state rendering, mute, and stop.
-
-Run the demo:
-
-```bash
-git clone https://github.com/AgoraIO-Conversational-AI/agent-client-toolkit-swift.git
-cd agent-client-toolkit-swift
-pod install
-open VoiceAgent.xcworkspace
-```
-
-Copy the sample secrets file and fill in your Agora credentials:
-
-```bash
-cp VoiceAgent/Secrets.example.plist VoiceAgent/Secrets.plist
-```
-
-Configuration fields:
-
-- `AGORA_APP_ID`: Your Agora App ID.
-- `AGORA_APP_CERTIFICATE`: Your Agora App Certificate.
-
-The demo uses Agora-managed keyless mode for ASR, LLM, and TTS model selection, but still requires App ID and App Certificate for token generation and REST API authorization. Production apps should generate tokens and start/stop agents from your own backend instead of calling REST APIs directly from the client.
-
-Before trying the demo, create an Agora project, enable Conversational AI Engine, and enable RTM. See [Enable the service](https://doc.agora.cn/doc/convoai/restful/get-started/enable-service).
-
-## Repository Layout
-
-```text
-.
-|-- AgoraAgentClientToolkit/
-|   |-- AgoraAgentClientToolkit.podspec
-|   |-- README.md
-|   `-- AgoraAgentClientToolkit/Classes/
-|-- VoiceAgent/                 # UIKit demo app
-|-- Tests/
-|-- Package.swift
-|-- Podfile
-`-- scripts/
-```
-
-## Development
-
-```bash
-# Demo app dependencies
-pod install
-
-# Validate SwiftPM manifest and build
-scripts/verify_spm.sh
-```
+The server processing results are delivered through `onUserManualSosEvent` and
+`onUserManualEosEvent`. The toolkit only sends the RTM marker and returns the
+generated `requestId`; the host app still owns the agent start request and the
+choice of SOS / EOS detection mode.
 
 ## Maintainers
 

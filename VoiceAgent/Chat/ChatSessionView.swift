@@ -14,7 +14,13 @@ class ChatSessionView: UIView {
     private let transcriptCardView = UIView()
     let tableView = UITableView()
     let statusView = AgentStateView()
+    private let capabilityPanelView = UIView()
+    private let capabilityTitleLabel = UILabel()
+    private let manualActionStackView = UIStackView()
     private let controlBarView = UIStackView()
+    private var capabilityPanelHeightConstraint: Constraint?
+    let manualSosButton = UIButton(type: .system)
+    let manualEosButton = UIButton(type: .system)
     let micButton = UIButton(type: .custom)
     let endCallButton = UIButton(type: .custom)
 
@@ -42,10 +48,30 @@ class ChatSessionView: UIView {
 
         tableView.separatorStyle = .none
         tableView.backgroundColor = .clear
-        tableView.contentInset = UIEdgeInsets(top: 12, left: 0, bottom: 12, right: 0)
+        tableView.contentInset = .zero
         tableView.scrollIndicatorInsets = tableView.contentInset
         tableView.register(TranscriptMessageCell.self, forCellReuseIdentifier: TranscriptMessageCell.reuseIdentifier)
         transcriptCardView.addSubview(tableView)
+
+        capabilityPanelView.backgroundColor = AppColors.bgControlBar
+        transcriptCardView.addSubview(capabilityPanelView)
+
+        capabilityTitleLabel.text = "Capabilities"
+        capabilityTitleLabel.textColor = AppColors.textSubtitle
+        capabilityTitleLabel.font = .systemFont(ofSize: 12, weight: .bold)
+        capabilityPanelView.addSubview(capabilityTitleLabel)
+
+        manualActionStackView.axis = .horizontal
+        manualActionStackView.alignment = .fill
+        manualActionStackView.distribution = .fillEqually
+        manualActionStackView.spacing = 8
+        capabilityPanelView.addSubview(manualActionStackView)
+
+        configureManualButton(manualSosButton, title: "SOS")
+        configureManualButton(manualEosButton, title: "EOS")
+        manualActionStackView.addArrangedSubview(manualSosButton)
+        manualActionStackView.addArrangedSubview(manualEosButton)
+        capabilityPanelView.isHidden = true
 
         transcriptCardView.addSubview(statusView)
 
@@ -62,13 +88,23 @@ class ChatSessionView: UIView {
         micButton.clipsToBounds = true
         controlBarView.addArrangedSubview(micButton)
 
-        endCallButton.setTitle("Stop Agent", for: .normal)
+        endCallButton.setTitle("Stop", for: .normal)
         endCallButton.setTitleColor(.white, for: .normal)
-        endCallButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
+        endCallButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .bold)
         endCallButton.backgroundColor = AppColors.btnStopBg
         endCallButton.layer.cornerRadius = 8
         endCallButton.clipsToBounds = true
         controlBarView.addArrangedSubview(endCallButton)
+    }
+
+    private func configureManualButton(_ button: UIButton, title: String) {
+        button.setTitle(title, for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .bold)
+        button.backgroundColor = AppColors.btnManualBg
+        button.layer.cornerRadius = 8
+        button.clipsToBounds = true
+        button.heightAnchor.constraint(equalToConstant: 44).isActive = true
     }
 
     private func setupConstraints() {
@@ -93,8 +129,24 @@ class ChatSessionView: UIView {
             make.bottom.equalTo(controlBarView.snp.top).offset(-16)
         }
 
-        tableView.snp.makeConstraints { make in
+        capabilityPanelView.snp.makeConstraints { make in
             make.top.left.right.equalToSuperview()
+            capabilityPanelHeightConstraint = make.height.equalTo(0).constraint
+        }
+
+        capabilityTitleLabel.snp.makeConstraints { make in
+            make.top.left.right.equalToSuperview().inset(12)
+        }
+
+        manualActionStackView.snp.makeConstraints { make in
+            make.top.equalTo(capabilityTitleLabel.snp.bottom).offset(8)
+            make.left.right.equalToSuperview().inset(12)
+            make.height.equalTo(44)
+        }
+
+        tableView.snp.makeConstraints { make in
+            make.top.equalTo(capabilityPanelView.snp.bottom)
+            make.left.right.equalToSuperview()
             make.bottom.equalTo(statusView.snp.top)
         }
 
@@ -118,6 +170,16 @@ class ChatSessionView: UIView {
 
     func setControlsVisible(_ visible: Bool) {
         controlBarView.isHidden = !visible
+    }
+
+    func updateManualActions(isManualSosEnabled: Bool, isManualEosEnabled: Bool, isConnected: Bool) {
+        let shouldShowPanel = isConnected && (isManualSosEnabled || isManualEosEnabled)
+        capabilityPanelView.isHidden = !shouldShowPanel
+        capabilityPanelHeightConstraint?.update(offset: shouldShowPanel ? 92 : 0)
+        manualSosButton.isHidden = !shouldShowPanel || !isManualSosEnabled
+        manualEosButton.isHidden = !shouldShowPanel || !isManualEosEnabled
+        manualSosButton.isEnabled = shouldShowPanel && isManualSosEnabled
+        manualEosButton.isEnabled = shouldShowPanel && isManualEosEnabled
     }
 
     // UIKit may reset the table background color to a system dynamic color during layout.

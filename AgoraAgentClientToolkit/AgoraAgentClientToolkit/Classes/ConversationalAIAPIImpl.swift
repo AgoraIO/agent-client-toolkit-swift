@@ -10,7 +10,7 @@ import AgoraRtcKit
 import AgoraRtmKit
 
 @objc public class ConversationalAIAPIImpl: NSObject {
-    public static let version: String = "2.2.0"
+    public static let version: String = "2.9.0"
     private let tag: String = "[ConvoAPI]"
     private let delegates = NSHashTable<ConversationalAIAPIEventHandler>.weakObjects()
     private let config: ConversationalAIAPIConfig
@@ -102,6 +102,26 @@ extension ConversationalAIAPIImpl: ConversationalAIAPI {
             callMessagePrint(msg: "[traceId:\(traceId)] JSON Serialization Error: \(covoAiError.message)")
             completion(covoAiError)
         }
+    }
+
+    @objc public func manualSOS(agentUserId: String, completion: @escaping (String, ConversationalAIAPIError?) -> Void) {
+        let requestId = buildManualTurnRequestId(prefix: "sos")
+        publishManualTurn(
+            agentUserId: agentUserId,
+            customType: "user.manual_sos",
+            requestId: requestId,
+            completion: completion
+        )
+    }
+
+    @objc public func manualEOS(agentUserId: String, completion: @escaping (String, ConversationalAIAPIError?) -> Void) {
+        let requestId = buildManualTurnRequestId(prefix: "eos")
+        publishManualTurn(
+            agentUserId: agentUserId,
+            customType: "user.manual_eos",
+            requestId: requestId,
+            completion: completion
+        )
     }
     
     @objc public func loadAudioSettings() {
@@ -289,6 +309,66 @@ extension ConversationalAIAPIImpl {
             completion(covoAiError)
         }
     }
+
+    private func publishManualTurn(
+        agentUserId: String,
+        customType: String,
+        requestId: String,
+        completion: @escaping (String, ConversationalAIAPIError?) -> Void
+    ) {
+        guard let rtmEngine = self.config.rtmEngine else {
+            let error = ConversationalAIAPIError(type: .rtmError, code: -1, message: "rtmEngine is nil")
+            completion(requestId, error)
+            return
+        }
+
+        let traceId = requestId
+        callMessagePrint(msg: ">>> [traceId:\(traceId)] [\(customType)] [requestId:\(requestId)] \(agentUserId)")
+
+        let publishOptions = AgoraRtmPublishOptions()
+        publishOptions.channelType = .user
+        publishOptions.customType = customType
+
+        let message: [String: Any] = [
+            "request_id": requestId
+        ]
+
+        do {
+            let data = try JSONSerialization.data(withJSONObject: message)
+            guard let stringData = String(data: data, encoding: .utf8) else {
+                let error = ConversationalAIAPIError(type: .unknown, code: -1, message: "String conversion failed")
+                callMessagePrint(msg: "[traceId:\(traceId)] \(error.message)")
+                completion(requestId, error)
+                return
+            }
+
+            callMessagePrint(msg: "[traceId:\(traceId)] rtm publish \(stringData)")
+            rtmEngine.publish(channelName: agentUserId, message: stringData, option: publishOptions) { [weak self] res, error in
+                if let errorInfo = error {
+                    let covoAiError = ConversationalAIAPIError(type: .rtmError, code: errorInfo.code, message: errorInfo.reason)
+                    self?.callMessagePrint(msg: "<<< [traceId:\(traceId)] rtm publish error: \(covoAiError.message)")
+                    completion(requestId, covoAiError)
+                } else if let _ = res {
+                    self?.callMessagePrint(msg: "<<< [traceId:\(traceId)] rtm publish success")
+                    completion(requestId, nil)
+                } else {
+                    let covoAiError = ConversationalAIAPIError(type: .rtmError, code: -1, message: "unknown error")
+                    self?.callMessagePrint(msg: "<<< [traceId:\(traceId)] rtm publish error: \(covoAiError.message)")
+                    completion(requestId, covoAiError)
+                }
+            }
+        } catch {
+            let covoAiError = ConversationalAIAPIError(type: .unknown, code: -1, message: "Message serialization failed: \(error.localizedDescription)")
+            callMessagePrint(msg: "[traceId:\(traceId)] \(covoAiError.message)")
+            completion(requestId, covoAiError)
+        }
+    }
+
+    private func buildManualTurnRequestId(prefix: String) -> String {
+        let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+        let traceId = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
+        return "\(prefix)-req-\(timestamp)-\(traceId)"
+    }
     
     private func notifyDelegatesStateChange(agentUserId: String, event: StateChangeEvent) {
         callMessagePrint(msg: "<<< [onAgentStateChanged] agentUserId:\(agentUserId), event:\(event)")
@@ -359,6 +439,33 @@ extension ConversationalAIAPIImpl {
         DispatchQueue.main.async {
             for delegate in self.delegates.allObjects {
                 delegate.onAgentVoiceprintStateChanged(agentUserId: agentUserId, event: event)
+            }
+        }
+    }
+
+    private func notifyDelegatesUserManualSos(agentUserId: String, event: UserManualSosEvent) {
+        callMessagePrint(msg: "<<< [onUserManualSosEvent], agentUserId: \(agentUserId), event: \(event)")
+        DispatchQueue.main.async {
+            for delegate in self.delegates.allObjects {
+                delegate.onUserManualSosEvent?(agentUserId: agentUserId, event: event)
+            }
+        }
+    }
+
+    private func notifyDelegatesUserManualEos(agentUserId: String, event: UserManualEosEvent) {
+        callMessagePrint(msg: "<<< [onUserManualEosEvent], agentUserId: \(agentUserId), event: \(event)")
+        DispatchQueue.main.async {
+            for delegate in self.delegates.allObjects {
+                delegate.onUserManualEosEvent?(agentUserId: agentUserId, event: event)
+            }
+        }
+    }
+
+    private func notifyDelegatesAgentManualEos(agentUserId: String, event: AgentManualEosEvent) {
+        callMessagePrint(msg: "<<< [onAgentManualEosEvent], agentUserId: \(agentUserId), event: \(event)")
+        DispatchQueue.main.async {
+            for delegate in self.delegates.allObjects {
+                delegate.onAgentManualEosEvent?(agentUserId: agentUserId, event: event)
             }
         }
     }
@@ -463,9 +570,127 @@ extension ConversationalAIAPIImpl {
             handleMessageReceipt(uid: uid, msg: msg)
         case .voiceprint:
             handleVoiceprintMessage(uid: uid, msg: msg)
+        case .userManualSOSResult:
+            handleUserManualSosMessage(uid: uid, msg: msg)
+        case .userManualEOSResult:
+            handleUserManualEosMessage(uid: uid, msg: msg)
+        case .agentManualEOSResult:
+            handleAgentManualEosMessage(uid: uid, msg: msg)
         default:
             break
         }
+    }
+
+    private func handleUserManualSosMessage(uid: String, msg: [String: Any]) {
+        guard let event = ConversationalAIAPIImpl.parseUserManualSosEvent(msg) else {
+            callMessagePrint(msg: "[onUserManualSosEvent] ignore invalid message: payload missing")
+            return
+        }
+
+        notifyDelegatesUserManualSos(agentUserId: uid, event: event)
+    }
+
+    private func handleUserManualEosMessage(uid: String, msg: [String: Any]) {
+        guard let event = ConversationalAIAPIImpl.parseUserManualEosEvent(msg) else {
+            callMessagePrint(msg: "[onUserManualEosEvent] ignore invalid message: payload missing")
+            return
+        }
+
+        notifyDelegatesUserManualEos(agentUserId: uid, event: event)
+    }
+
+    private func handleAgentManualEosMessage(uid: String, msg: [String: Any]) {
+        guard let event = ConversationalAIAPIImpl.parseAgentManualEosEvent(msg) else {
+            callMessagePrint(msg: "[onAgentManualEosEvent] ignore invalid message: payload missing")
+            return
+        }
+
+        notifyDelegatesAgentManualEos(agentUserId: uid, event: event)
+    }
+
+    static func parseUserManualSosEvent(_ msg: [String: Any]) -> UserManualSosEvent? {
+        guard let payload = parseUserManualPayload(msg["payload"]) else {
+            return nil
+        }
+
+        return UserManualSosEvent(
+            eventId: msg["event_id"] as? String ?? "",
+            timestamp: numberAsDouble(msg["event_ms"]) ?? 0,
+            payload: payload
+        )
+    }
+
+    static func parseUserManualEosEvent(_ msg: [String: Any]) -> UserManualEosEvent? {
+        guard let payload = parseUserManualPayload(msg["payload"]) else {
+            return nil
+        }
+
+        return UserManualEosEvent(
+            eventId: msg["event_id"] as? String ?? "",
+            timestamp: numberAsDouble(msg["event_ms"]) ?? 0,
+            payload: payload
+        )
+    }
+
+    static func parseAgentManualEosEvent(_ msg: [String: Any]) -> AgentManualEosEvent? {
+        guard let payload = msg["payload"] as? [String: Any] else {
+            return nil
+        }
+
+        let eventPayload = AgentManualEosPayload(
+            reason: payload["reason"] as? String ?? "",
+            maxDurationMs: numberAsInt(payload["max_duration_ms"]) ?? 0,
+            turnId: numberAsInt(payload["turn_id"]) ?? 0
+        )
+
+        return AgentManualEosEvent(
+            eventId: msg["event_id"] as? String ?? "",
+            timestamp: numberAsDouble(msg["event_ms"]) ?? 0,
+            payload: eventPayload
+        )
+    }
+
+    private static func parseUserManualPayload(_ rawPayload: Any?) -> UserManualEventPayload? {
+        guard let payload = rawPayload as? [String: Any] else {
+            return nil
+        }
+
+        return UserManualEventPayload(
+            success: payload["success"] as? Bool ?? false,
+            requestId: payload["request_id"] as? String ?? "",
+            turnId: numberAsNSNumber(payload["turn_id"]),
+            errorMessage: payload["error_message"] as? String
+        )
+    }
+
+    private static func numberAsNSNumber(_ value: Any?) -> NSNumber? {
+        if let number = value as? NSNumber {
+            return number
+        }
+        if let int = value as? Int {
+            return NSNumber(value: int)
+        }
+        if let int64 = value as? Int64 {
+            return NSNumber(value: int64)
+        }
+        if let double = value as? Double {
+            return NSNumber(value: double)
+        }
+        return nil
+    }
+
+    private static func numberAsInt(_ value: Any?) -> Int? {
+        if let number = numberAsNSNumber(value) {
+            return number.intValue
+        }
+        return nil
+    }
+
+    private static func numberAsDouble(_ value: Any?) -> Double? {
+        if let number = numberAsNSNumber(value) {
+            return number.doubleValue
+        }
+        return nil
     }
 
     private func handleTurnFinishedMessage(uid: String, msg: [String: Any]) {
@@ -602,7 +827,7 @@ extension ConversationalAIAPIImpl {
             let currentStateChangeEvent = stateChangeEvents[agentUserId]
             let shouldNotifyStateChange: Bool
 
-            if let timestamp = timestamp {
+            if timestamp != nil {
                 shouldNotifyStateChange =
                     turnId >= (currentStateChangeEvent?.turnId ?? 0)
             } else {

@@ -18,8 +18,6 @@ public class NetworkManager:NSObject {
         case POST
     }
     
-    var gameToken: String = ""
-
     public typealias SuccessClosure = ([String: Any]) -> Void
     public typealias FailClosure = (String) -> Void
 
@@ -35,15 +33,6 @@ public class NetworkManager:NSObject {
 
     public static let shared = NetworkManager()
     
-    private func basicAuth(key: String, password: String) -> String {
-        let loginString = String(format: "%@:%@", key, password)
-        guard let loginData = loginString.data(using: String.Encoding.utf8) else {
-            return ""
-        }
-        let base64LoginString = loginData.base64EncodedString()
-        return base64LoginString
-    }
-    
     /// get token
     /// - Parameters:
     ///   - channelName: the name of channel
@@ -54,18 +43,36 @@ public class NetworkManager:NSObject {
                        expire: Int = 86400,
                        types: [AgoraTokenType],
                        success: @escaping (String?) -> Void) {
-        let params = ["appCertificate": KeyCenter.AG_APP_CERTIFICATE,
-                      "appId": KeyCenter.AG_APP_ID,
-                      "channelName": channelName,
-                      "expire": expire,
-                      "src": "iOS",
-                      "ts": 0,
-                      "types": types.map({NSNumber(value: $0.rawValue)}),
-                      "uid": uid] as [String: Any]
-        let url = "https://service.apprtc.cn/toolbox/v2/token/generate"
+        var params: [String: Any] = [
+            "appId": KeyCenter.APP_ID,
+            "channelName": channelName,
+            "expire": expire,
+            "src": "iOS",
+            "ts": String(Int(Date().timeIntervalSince1970 * 1000)),
+            "uid": uid
+        ]
+
+        if !KeyCenter.APP_CERTIFICATE.isEmpty {
+            params["appCertificate"] = KeyCenter.APP_CERTIFICATE
+        }
+
+        if types.count == 1, let type = types.first {
+            params["type"] = NSNumber(value: type.rawValue)
+        } else {
+            params["types"] = types.map { NSNumber(value: $0.rawValue) }
+        }
+
+        let host = KeyCenter.TOOLBOX_SERVER_HOST.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let url = "\(host)/v2/token/generate"
         NetworkManager.shared.postRequest(urlString: url,
                                           params: params) { response in
-            let data = response["data"] as? [String: String]
+            if let code = response["code"] as? Int, code != 0 {
+                print("[NetworkManager] generateToken failed: code=\(code), message=\(String(describing: response["message"]))")
+                success(nil)
+                return
+            }
+
+            let data = response["data"] as? [String: Any]
             let token = data?["token"] as? String
             success(token)
         } failure: { error in
@@ -85,86 +92,6 @@ public class NetworkManager:NSObject {
         DispatchQueue.global().async {
             self.request(urlString: urlString, params: params, method: .POST, headers: headers, success: success, failure: failure)
         }
-    }
-
-    public func uploadRequest(urlString: String,
-                              parameters: [String: String],
-                              imageData: Data,
-                              success: SuccessClosure?,
-                              failure: FailClosure?) {
-        uploadRequest(urlString: urlString,
-                     parameters: parameters,
-                     fileData: imageData,
-                     fileName: "image.jpg",
-                     mimeType: "image/jpeg",
-                     fieldName: "image",
-                     success: success,
-                     failure: failure)
-    }
-    
-    /// Upload file with flexible format support
-    /// - Parameters:
-    ///   - urlString: API endpoint URL
-    ///   - parameters: Text parameters for the request
-    ///   - fileData: File data to upload
-    ///   - fileName: Name of the file (e.g., "voiceprint.pcm")
-    ///   - mimeType: MIME type of the file (e.g., "audio/mp4")
-    ///   - fieldName: Form field name for the file (e.g., "file", "audio")
-    ///   - success: Success callback
-    ///   - failure: Failure callback
-    public func uploadRequest(urlString: String,
-                              parameters: [String: String],
-                              fileData: Data,
-                              fileName: String,
-                              mimeType: String,
-                              fieldName: String,
-                              success: SuccessClosure?,
-                              failure: FailClosure?) {
-        guard let url = URL(string: urlString) else {
-            failure?("Invalid URL")
-            return
-        }
-        
-        // Create multipart form data
-        let boundary = "Boundary-\(UUID().uuidString)"
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        
-        // Set headers with auth token
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
-        // Create multipart body
-        var body = Data()
-        
-        // Add text parameters
-        for (key, value) in parameters {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n".data(using: .utf8)!)
-            body.append("\(value)\r\n".data(using: .utf8)!)
-        }
-        
-        // Add file data with flexible format
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
-        body.append(fileData)
-        body.append("\r\n".data(using: .utf8)!)
-        
-        // Close boundary
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        
-        request.httpBody = body
-        // Use existing sessionConfig with longer timeout for uploads
-        let config = sessionConfig
-        config.timeoutIntervalForRequest = 60 // Longer timeout for uploads
-        config.timeoutIntervalForResource = 60
-        let session = URLSession(configuration: config)
-        
-        session.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                self.checkResponse(response: response, data: data, success: success, failure: failure)
-            }
-        }.resume()
     }
 
     private func request(urlString: String,
@@ -223,12 +150,6 @@ public class NetworkManager:NSObject {
         }
         
         return request
-    }
-
-    private func convertParams(params: [String: Any]?) -> String {
-        guard let params = params else { return "" }
-        let value = params.map({ String(format: "%@=%@", $0.key, "\($0.value)") }).joined(separator: "&")
-        return value
     }
 
     private func checkResponse(response: URLResponse?, data: Data?, success: SuccessClosure?, failure: FailClosure?) {

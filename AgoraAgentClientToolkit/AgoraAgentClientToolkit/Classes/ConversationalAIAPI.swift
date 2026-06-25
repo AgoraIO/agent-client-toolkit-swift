@@ -226,6 +226,114 @@ import AgoraRtmKit
     }
 }
 
+/// Payload for user-triggered manual SOS/EOS result events.
+@objc public class UserManualEventPayload: NSObject {
+    /// Whether the server accepted and applied the manual turn label.
+    @objc public let success: Bool
+    /// Toolkit-generated ID used to correlate the API call with the server callback.
+    @objc public let requestId: String
+    /// Turn ID associated with the result, or nil when the server failure response does not include one.
+    @objc public let turnId: NSNumber?
+    /// Server-provided error message for failed results.
+    @objc public let errorMessage: String?
+
+    @objc public init(success: Bool, requestId: String, turnId: NSNumber?, errorMessage: String?) {
+        self.success = success
+        self.requestId = requestId
+        self.turnId = turnId
+        self.errorMessage = errorMessage
+        super.init()
+    }
+
+    public override var description: String {
+        return "UserManualEventPayload(success: \(success), requestId: \(requestId), turnId: \(turnId?.stringValue ?? "nil"), errorMessage: \(errorMessage ?? "nil"))"
+    }
+}
+
+/// Server result for a user-triggered manual SOS request.
+@objc public class UserManualSosEvent: NSObject {
+    /// Server event ID.
+    @objc public let eventId: String
+    /// Event occurrence timestamp in milliseconds.
+    @objc public let timestamp: TimeInterval
+    /// Manual SOS result payload.
+    @objc public let payload: UserManualEventPayload
+
+    @objc public init(eventId: String, timestamp: TimeInterval, payload: UserManualEventPayload) {
+        self.eventId = eventId
+        self.timestamp = timestamp
+        self.payload = payload
+        super.init()
+    }
+
+    public override var description: String {
+        return "UserManualSosEvent(eventId: \(eventId), timestamp: \(timestamp), payload: \(payload))"
+    }
+}
+
+/// Server result for a user-triggered manual EOS request.
+@objc public class UserManualEosEvent: NSObject {
+    /// Server event ID.
+    @objc public let eventId: String
+    /// Event occurrence timestamp in milliseconds.
+    @objc public let timestamp: TimeInterval
+    /// Manual EOS result payload.
+    @objc public let payload: UserManualEventPayload
+
+    @objc public init(eventId: String, timestamp: TimeInterval, payload: UserManualEventPayload) {
+        self.eventId = eventId
+        self.timestamp = timestamp
+        self.payload = payload
+        super.init()
+    }
+
+    public override var description: String {
+        return "UserManualEosEvent(eventId: \(eventId), timestamp: \(timestamp), payload: \(payload))"
+    }
+}
+
+/// Payload for server-triggered automatic EOS in manual mode.
+@objc public class AgentManualEosPayload: NSObject {
+    /// Server reason for the automatic EOS.
+    @objc public let reason: String
+    /// Configured maximum audio duration in milliseconds.
+    @objc public let maxDurationMs: Int
+    /// Turn ID associated with the automatic EOS.
+    @objc public let turnId: Int
+
+    @objc public init(reason: String, maxDurationMs: Int, turnId: Int) {
+        self.reason = reason
+        self.maxDurationMs = maxDurationMs
+        self.turnId = turnId
+        super.init()
+    }
+
+    public override var description: String {
+        return "AgentManualEosPayload(reason: \(reason), maxDurationMs: \(maxDurationMs), turnId: \(turnId))"
+    }
+}
+
+/// Server notification for automatic EOS caused by manual-mode limits.
+@objc public class AgentManualEosEvent: NSObject {
+    /// Server event ID.
+    @objc public let eventId: String
+    /// Event occurrence timestamp in milliseconds.
+    @objc public let timestamp: TimeInterval
+    /// Automatic EOS payload.
+    @objc public let payload: AgentManualEosPayload
+
+    @objc public init(eventId: String, timestamp: TimeInterval, payload: AgentManualEosPayload) {
+        self.eventId = eventId
+        self.timestamp = timestamp
+        self.payload = payload
+        super.init()
+    }
+
+    public override var description: String {
+        return "AgentManualEosEvent(eventId: \(eventId), timestamp: \(timestamp), payload: \(payload))"
+    }
+}
+
 /// Performance metric module type enumeration
 /// Represents different types of AI modules for performance monitoring
 @objc public enum ModuleType: Int, Codable {
@@ -385,6 +493,12 @@ public enum MessageType: String, CaseIterable {
     case messageReceipt = "message.info"
     /// voice status message
     case voiceprint = "message.sal_status"
+    /// User manual start-of-speech result
+    case userManualSOSResult = "user.manual_sos.result"
+    /// User manual end-of-speech result
+    case userManualEOSResult = "user.manual_eos.result"
+    /// Agent automatic end-of-speech result in manual mode
+    case agentManualEOSResult = "assistant.manual_eos.result"
     /// Unknown message type
     case unknown = "unknown"
     
@@ -896,6 +1010,27 @@ public enum MessageType: String, CaseIterable {
     ///   - agentUserId: Agent RTM user ID
     ///   - event: Voiceprint event containing send timestamp, message id, timestamp, and status
     @objc func onAgentVoiceprintStateChanged(agentUserId: String, event: VoiceprintStateChangeEvent)
+
+    /// Called when the server returns the result for a user-triggered manual SOS request.
+    ///
+    /// - Parameters:
+    ///   - agentUserId: Agent RTM user ID
+    ///   - event: Manual SOS result event
+    @objc optional func onUserManualSosEvent(agentUserId: String, event: UserManualSosEvent)
+
+    /// Called when the server returns the result for a user-triggered manual EOS request.
+    ///
+    /// - Parameters:
+    ///   - agentUserId: Agent RTM user ID
+    ///   - event: Manual EOS result event
+    @objc optional func onUserManualEosEvent(agentUserId: String, event: UserManualEosEvent)
+
+    /// Called when the server reports an automatic EOS in manual mode.
+    ///
+    /// - Parameters:
+    ///   - agentUserId: Agent RTM user ID
+    ///   - event: Automatic EOS event
+    @objc optional func onAgentManualEosEvent(agentUserId: String, event: AgentManualEosEvent)
     
     ///Called when write log information
     ///This method is called when writing logs inside the component.
@@ -928,6 +1063,30 @@ public enum MessageType: String, CaseIterable {
     /// - Note: If error has a value, it indicates message sending failed.
     ///   If error is nil, it indicates message sending succeeded, but doesn't guarantee Agent interruption success
     @objc func interrupt(agentUserId: String, completion: @escaping (ConversationalAIAPIError?) -> Void)
+
+    /// Trigger a user-side manual start-of-speech marker through RTM.
+    ///
+    /// The request is sent with RTM custom type `user.manual_sos` and payload
+    /// `{"request_id":"<requestId>"}`. The completion callback only reports
+    /// whether RTM publish succeeded and returns the toolkit-generated request ID.
+    /// Server processing result is delivered through `onUserManualSosEvent`.
+    ///
+    /// - Parameters:
+    ///   - agentUserId: Agent RTM user ID, must be globally unique
+    ///   - completion: Callback with request ID and publish error; error is nil when RTM publish succeeds
+    @objc optional func manualSOS(agentUserId: String, completion: @escaping (String, ConversationalAIAPIError?) -> Void)
+
+    /// Trigger a user-side manual end-of-speech marker through RTM.
+    ///
+    /// The request is sent with RTM custom type `user.manual_eos` and payload
+    /// `{"request_id":"<requestId>"}`. The completion callback only reports
+    /// whether RTM publish succeeded and returns the toolkit-generated request ID.
+    /// Server processing result is delivered through `onUserManualEosEvent`.
+    ///
+    /// - Parameters:
+    ///   - agentUserId: Agent RTM user ID, must be globally unique
+    ///   - completion: Callback with request ID and publish error; error is nil when RTM publish succeeds
+    @objc optional func manualEOS(agentUserId: String, completion: @escaping (String, ConversationalAIAPIError?) -> Void)
     
     /// Set audio best practice parameters for optimal performance
     /// Configure audio parameters required for optimal performance in AI conversations
@@ -991,6 +1150,3 @@ public enum MessageType: String, CaseIterable {
     /// Call this method when you no longer need the ConversationalAI API.
     @objc func destroy()
 }
-
-
-

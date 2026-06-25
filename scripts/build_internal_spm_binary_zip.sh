@@ -24,7 +24,7 @@ if [[ -z "$VERSION" ]]; then
   VERSION="$(/usr/bin/ruby -e "spec = File.read(ARGV[0]); puts spec[/s\\.version\\s*=\\s*['\\\"]([^'\\\"]+)/, 1]" "$PODSPEC_PATH")"
 fi
 if [[ -z "$VERSION" ]]; then
-  echo "Unable to resolve version. Pass VERSION=1.0.0." >&2
+  echo "Unable to resolve version. Pass VERSION=2.9.0." >&2
   exit 1
 fi
 

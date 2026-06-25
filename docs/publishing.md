@@ -13,7 +13,7 @@ SwiftPM product: AgoraAgentClientToolkit
 The release version comes from `AgoraAgentClientToolkit/AgoraAgentClientToolkit.podspec`:
 
 ```ruby
-s.version = '1.0.0'
+s.version = '2.9.0'
 ```
 
 You can override the version for a local packaging run with:
@@ -35,7 +35,7 @@ pod install
 Run:
 
 ```bash
-VERSION=1.0.0 scripts/build_internal_cocoapods_zip.sh
+VERSION=2.9.0 scripts/build_internal_cocoapods_zip.sh
 ```
 
 The generated zip is written under:
@@ -57,7 +57,7 @@ sdk/
 Run:
 
 ```bash
-VERSION=1.0.0 scripts/build_internal_spm_source_zip.sh
+VERSION=2.9.0 scripts/build_internal_spm_source_zip.sh
 ```
 
 The generated zip is written under:
@@ -95,7 +95,7 @@ pod install
 Run:
 
 ```bash
-VERSION=1.0.0 scripts/build_internal_spm_binary_zip.sh
+VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
 ```
 
 The generated zip is written under:
@@ -128,7 +128,7 @@ AgoraRTM_iOS == 2.2.8
 Override them only for a deliberate compatibility test:
 
 ```bash
-RTC_VERSION=4.5.1 RTM_VERSION=2.2.8 VERSION=1.0.0 scripts/build_internal_spm_binary_zip.sh
+RTC_VERSION=4.5.1 RTM_VERSION=2.2.8 VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
 ```
 
 Validate the generated binary package from a clean extraction directory:
@@ -136,7 +136,7 @@ Validate the generated binary package from a clean extraction directory:
 ```bash
 rm -rf /private/tmp/AgoraAgentClientToolkit-spm-binary-verify
 mkdir -p /private/tmp/AgoraAgentClientToolkit-spm-binary-verify
-unzip -q build/internal-spm/AgoraAgentClientToolkit-1.0.0-binary-<timestamp>/AgoraAgentClientToolkit-1.0.0-spm-binary.zip \
+unzip -q build/internal-spm/AgoraAgentClientToolkit-2.9.0-binary-<timestamp>/AgoraAgentClientToolkit-2.9.0-spm-binary.zip \
   -d /private/tmp/AgoraAgentClientToolkit-spm-binary-verify
 cd /private/tmp/AgoraAgentClientToolkit-spm-binary-verify
 swift package dump-package >/dev/null

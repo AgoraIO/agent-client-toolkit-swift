@@ -13,10 +13,14 @@ import AgoraAgentClientToolkit
 import AVFAudio
 
 class ViewController: UIViewController {
+    private static let defaultLLMGreetingMessage = "hello man, I am an AI robot, I can do anything for you"
+    private static let defaultLLMFailureMessage = "Sorry, I don't know how to answer your question"
+
     // MARK: - UI Components
     private let backgroundGradientLayer = CAGradientLayer()
-    private let titleLabel = UILabel()
+    private let settingsButton = UIButton(type: .system)
     private let subtitleLabel = UILabel()
+    private let turnDetectionModeLabel = UILabel()
     private let logCardView = UIView()
     private let connectionStartView = ConnectionStartView()
     private let chatSessionView = ChatSessionView()
@@ -27,19 +31,16 @@ class ViewController: UIViewController {
     private var channel: String = ""
     private var transcripts: [Transcript] = []
     private var isMicMuted: Bool = false
-    private var isLoading: Bool = false
-    private var isError: Bool = false
-    private var initializationError: Error?
     private var currentAgentState: AgentState = .unknown
     private var startupState = SessionStartupState()
+    private var sosDetectionMode: TurnDetectionMode = .vad
+    private var eosDetectionMode: TurnDetectionMode = .semantic
     private var rtcJoinContinuation: CheckedContinuation<Void, Error>?
     private var debugLogList: [String] = []
     
     // MARK: - Agora Components
     private var token: String = ""
     private var agentToken: String = ""
-    // Auth token for REST API (app-credentials mode, requires APP_CERTIFICATE)
-    private var authToken: String = ""
     private var agentId: String = ""
     private var rtcEngine: AgoraRtcEngineKit?
     private var rtmEngine: AgoraRtmClientKit?
@@ -117,6 +118,28 @@ class ViewController: UIViewController {
         @unknown default: return "unknown"
         }
     }
+
+    private var isManualSosEnabled: Bool {
+        sosDetectionMode == .manual
+    }
+
+    private var isManualEosEnabled: Bool {
+        eosDetectionMode == .manual
+    }
+
+    private var canChangeTurnDetectionMode: Bool {
+        startupState.canStartConnection
+    }
+
+    private func refreshTurnDetectionUI() {
+        turnDetectionModeLabel.text = "SOS: \(sosDetectionMode.displayName)  |  EOS: \(eosDetectionMode.displayName)"
+        settingsButton.tintColor = canChangeTurnDetectionMode ? AppColors.micNormalIcon : AppColors.textWeak
+        chatSessionView.updateManualActions(
+            isManualSosEnabled: isManualSosEnabled,
+            isManualEosEnabled: isManualEosEnabled,
+            isConnected: startupState.phase == .connected
+        )
+    }
     
     // MARK: - Lifecycle
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
@@ -134,12 +157,6 @@ class ViewController: UIViewController {
         guard missingKeys.isEmpty else {
             let message = "Missing Agora configuration: \(missingKeys.joined(separator: ", "))"
             addDebugMessage(message)
-            initializationError = NSError(
-                domain: "KeyCenter",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: message]
-            )
-            isError = true
             connectionStartView.update(for: .error)
             showErrorToast(message)
             return false
@@ -167,17 +184,24 @@ class ViewController: UIViewController {
         backgroundGradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
         view.layer.insertSublayer(backgroundGradientLayer, at: 0)
 
-        titleLabel.text = "Agora Conversational AI"
-        titleLabel.textColor = AppColors.textTitle
-        titleLabel.font = .systemFont(ofSize: 20, weight: .bold)
-        titleLabel.numberOfLines = 1
-        view.addSubview(titleLabel)
+        settingsButton.setImage(UIImage(systemName: "gearshape.fill")?.withRenderingMode(.alwaysTemplate), for: .normal)
+        settingsButton.tintColor = AppColors.micNormalIcon
+        settingsButton.backgroundColor = .clear
+        settingsButton.contentEdgeInsets = UIEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
+        view.addSubview(settingsButton)
+        settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
 
         subtitleLabel.text = "Real-time Voice Conversation Demo"
         subtitleLabel.textColor = AppColors.textSubtitle
         subtitleLabel.font = .systemFont(ofSize: 13, weight: .regular)
         subtitleLabel.numberOfLines = 1
         view.addSubview(subtitleLabel)
+
+        turnDetectionModeLabel.textColor = AppColors.textTertiary
+        turnDetectionModeLabel.font = .systemFont(ofSize: 11, weight: .regular)
+        turnDetectionModeLabel.numberOfLines = 1
+        view.addSubview(turnDetectionModeLabel)
+        refreshTurnDetectionUI()
 
         logCardView.backgroundColor = UIColor(hex: 0x0F172A, alpha: 0.8)
         logCardView.layer.cornerRadius = 12
@@ -202,9 +226,12 @@ class ViewController: UIViewController {
         chatSessionView.tableView.dataSource = self
         chatSessionView.applyTableBackgroundWorkaround()
         chatSessionView.micButton.addTarget(self, action: #selector(toggleMicrophone), for: .touchUpInside)
+        chatSessionView.manualSosButton.addTarget(self, action: #selector(manualSosButtonTapped), for: .touchUpInside)
+        chatSessionView.manualEosButton.addTarget(self, action: #selector(manualEosButtonTapped), for: .touchUpInside)
         chatSessionView.endCallButton.addTarget(self, action: #selector(endCall), for: .touchUpInside)
         chatSessionView.updateStatusView(state: .idle)
         chatSessionView.setControlsVisible(false)
+        refreshTurnDetectionUI()
 
         view.addSubview(connectionStartView)
         connectionStartView.startButton.addTarget(self, action: #selector(startButtonTapped), for: .touchUpInside)
@@ -217,18 +244,26 @@ class ViewController: UIViewController {
     }
 
     private func setupConstraints() {
-        titleLabel.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide).offset(16)
-            make.left.right.equalToSuperview().inset(16)
+        settingsButton.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(4)
+            make.right.equalToSuperview().inset(16)
+            make.width.height.equalTo(32)
         }
 
         subtitleLabel.snp.makeConstraints { make in
-            make.top.equalTo(titleLabel.snp.bottom).offset(2)
-            make.left.right.equalToSuperview().inset(16)
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(4)
+            make.left.equalToSuperview().inset(16)
+            make.right.equalTo(settingsButton.snp.left).offset(-12)
+        }
+
+        turnDetectionModeLabel.snp.makeConstraints { make in
+            make.top.equalTo(subtitleLabel.snp.bottom)
+            make.left.equalToSuperview().inset(16)
+            make.right.equalTo(settingsButton.snp.left).offset(-12)
         }
 
         logCardView.snp.makeConstraints { make in
-            make.top.equalTo(subtitleLabel.snp.bottom).offset(12)
+            make.top.equalTo(settingsButton.snp.bottom).offset(6)
             make.left.right.equalToSuperview().inset(16)
             make.height.equalTo(120)
         }
@@ -258,7 +293,7 @@ class ViewController: UIViewController {
     }
     
     private func initializeRTM() {
-        let rtmConfig = AgoraRtmClientConfig(appId: KeyCenter.AG_APP_ID, userId: "\(uid)")
+        let rtmConfig = AgoraRtmClientConfig(appId: KeyCenter.APP_ID, userId: "\(uid)")
         rtmConfig.areaCode = [.CN, .NA]
         rtmConfig.presenceTimeout = 30
         rtmConfig.heartbeatInterval = 10
@@ -275,18 +310,12 @@ class ViewController: UIViewController {
     
     private func initializeRTC() {
         let rtcConfig = AgoraRtcEngineConfig()
-        rtcConfig.appId = KeyCenter.AG_APP_ID
+        rtcConfig.appId = KeyCenter.APP_ID
         rtcConfig.channelProfile = .liveBroadcasting
         rtcConfig.audioScenario = .aiClient
         let rtcEngine = AgoraRtcEngineKit.sharedEngine(with: rtcConfig, delegate: self)
         
-        rtcEngine.enableVideo()
         rtcEngine.enableAudioVolumeIndication(100, smooth: 3, reportVad: false)
-        
-        let cameraConfig = AgoraCameraCapturerConfiguration()
-        cameraConfig.cameraDirection = .rear
-        rtcEngine.setCameraCapturerConfiguration(cameraConfig)
-        
         rtcEngine.setParameters("{\"che.audio.enable.predump\":{\"enable\":\"true\",\"duration\":\"60\"}}")
         
         self.rtcEngine = rtcEngine
@@ -315,9 +344,8 @@ class ViewController: UIViewController {
     // MARK: - Connection Flow
     private func startConnection() {
         startupState.beginConnecting()
-        isLoading = true
-        isError = false
         connectionStartView.update(for: .connecting)
+        refreshTurnDetectionUI()
         showLoadingToast()
         
         Task {
@@ -341,15 +369,11 @@ class ViewController: UIViewController {
                 // 5. Generate the agent token
                 try await generateAgentToken()
 
-                // 6. Generate the auth token for REST API authorization
-                try await generateAuthToken()
-
-                // 7. Start the agent
+                // 6. Start the agent
                 try await startAgent()
                 
                 await MainActor.run {
                     startupState.markConnected()
-                    isLoading = false
                     hideLoadingToast()
                     switchToChatView()
                 }
@@ -357,9 +381,7 @@ class ViewController: UIViewController {
                 await MainActor.run {
                     cleanupAfterConnectionFailure()
                     startupState.markFailed()
-                    initializationError = error
-                    isLoading = false
-                    isError = true
+                    refreshTurnDetectionUI()
                     hideLoadingToast()
                     connectionStartView.update(for: .error)
                     showErrorToast(error.localizedDescription)
@@ -377,7 +399,6 @@ class ViewController: UIViewController {
         rtmEngine?.logout { _, _ in }
         token = ""
         agentToken = ""
-        authToken = ""
         agentId = ""
     }
 
@@ -436,24 +457,6 @@ class ViewController: UIViewController {
             }
         }
     }
-
-    // Auth token for REST API authorization. Generated separately from the agent
-    // RTC token so the REST `Authorization: agora token=<authToken>` header carries
-    // its own credential (requires APP_CERTIFICATE enabled in the Agora console).
-    private func generateAuthToken() async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            NetworkManager.shared.generateToken(channelName: channel, uid: "\(agentUid)", types: [.rtc, .rtm]) { token in
-                guard let token = token else {
-                    self.addDebugMessage("Generate auth token failed")
-                    continuation.resume(throwing: NSError(domain: "generateAuthToken", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get auth token. Please try again."]))
-                    return
-                }
-                self.authToken = token
-                self.addDebugMessage("Generate auth token successfully")
-                continuation.resume()
-            }
-        }
-    }
     
     // MARK: - Channel Connection
     @MainActor
@@ -498,9 +501,8 @@ class ViewController: UIViewController {
         let options = AgoraRtcChannelMediaOptions()
         options.clientRoleType = .broadcaster
         options.publishMicrophoneTrack = true
-        options.publishCameraTrack = false
         options.autoSubscribeAudio = true
-        options.autoSubscribeVideo = true
+        options.autoSubscribeVideo = false
         let result = rtcEngine.joinChannel(byToken: token, channelId: channel, uid: UInt(uid), mediaOptions: options)
         if result != 0 {
             addDebugMessage("Rtc joinChannel failed ret: \(result)")
@@ -536,13 +538,67 @@ class ViewController: UIViewController {
     }
     
     // MARK: - Agent Management
+    private func startOfSpeechConfig(for mode: TurnDetectionMode) -> [String: Any] {
+        switch mode {
+        case .vad:
+            return [
+                "mode": mode.rawValue,
+                "vad_config": [
+                    "interrupt_duration_ms": 500,
+                    "speaking_interrupt_duration_ms": 300,
+                    "prefix_padding_ms": 800
+                ]
+            ]
+        case .semantic:
+            return [
+                "mode": mode.rawValue,
+                "semantic_config": [
+                    "interrupt_duration_ms": 200,
+                    "prefix_padding_ms": 920,
+                    "speaking_interrupt_duration_ms": 350,
+                    "ignored_words": ignoredTurnDetectionWords()
+                ]
+            ]
+        case .manual:
+            return [
+                "mode": mode.rawValue
+            ]
+        }
+    }
+
+    private func endOfSpeechConfig(for mode: TurnDetectionMode) -> [String: Any] {
+        switch mode {
+        case .vad:
+            return [
+                "mode": mode.rawValue,
+                "vad_config": [
+                    "silence_duration_ms": 660
+                ]
+            ]
+        case .semantic:
+            return [
+                "mode": mode.rawValue,
+                "semantic_config": [
+                    "silence_duration_ms": 480,
+                    "max_wait_ms": 1200,
+                    "pause_state_enabled": false
+                ]
+            ]
+        case .manual:
+            return [
+                "mode": mode.rawValue
+            ]
+        }
+    }
+
+    private func ignoredTurnDetectionWords() -> [String] {
+        return ["uh-huh", "okay"]
+    }
+
     private func startAgent() async throws {
         return try await withCheckedThrowingContinuation { continuation in
-            // Align with the working Kotlin curl payload: use the managed preset
-            // combo plus inline llm/tts supplemental settings.
             let parameter: [String: Any] = [
                 "name": channel,
-                "preset": "deepgram_nova_3,openai_gpt_4o_mini,minimax_speech_2_6_turbo",
                 "properties": [
                     "channel": channel,
                     "token": agentToken,
@@ -551,64 +607,59 @@ class ViewController: UIViewController {
                     "enable_string_uid": false,
                     "idle_timeout": 120,
                     "advanced_features": [
+                        "enable_aivad": false,
+                        "enable_bhvs": true,
+                        "enable_sal": false,
                         "enable_rtm": true
                     ],
                     "asr": [
-                        "language": "en"
-                    ],
-                    "llm": [
-                        "system_messages": [
-                            ["role": "system", "content": "You are a friendly voice assistant. Keep replies to one or two sentences."]
-                        ],
-                        "greeting_message": "Hi there! How can I help you today?",
-                        "failure_message": "Please wait a moment."
+                        "vendor": KeyCenter.ASR_VENDOR,
+                        "params": [
+                            "api_key": KeyCenter.ASR_API_KEY,
+                            "model": KeyCenter.ASR_MODEL
+                        ]
                     ],
                     "tts": [
-                        "vendor": "minimax",
+                        "vendor": KeyCenter.TTS_VENDOR,
                         "params": [
-                            "voice_setting": [
-                                "voice_id": "English_captivating_female1"
-                            ]
+                            "key": KeyCenter.TTS_KEY,
+                            "model_id": KeyCenter.TTS_MODEL_ID,
+                            "voice_id": KeyCenter.TTS_VOICE_ID,
+                            "sample_rate": KeyCenter.TTS_SAMPLE_RATE
                         ]
                     ],
-                    "parameters": [
-                        "audio_scenario": "chorus",
-                        "data_channel": "rtm",
-                        "enable_error_message": true,
-                        "silence_config": [
-                            "action": "speak",
-                            "timeout_ms": 0
+                    "llm": [
+                        "url": KeyCenter.LLM_URL,
+                        "api_key": KeyCenter.LLM_API_KEY,
+                        "params": [
+                            "model": KeyCenter.LLM_MODEL
                         ],
-                        "farewell_config": [
-                            "graceful_enabled": "false",
-                            "graceful_timeout_seconds": 0
-                        ]
+                        "greeting_message": Self.defaultLLMGreetingMessage,
+                        "failure_message": Self.defaultLLMFailureMessage
+                    ],
+                    "parameters": [
+                        "enable_metrics": true,
+                        "enable_error_message": true,
+                        "output_audio_codec": "OPUSFB",
+                        "audio_scenario": "default",
+                        "transcript": [
+                            "enable": true,
+                            "protocol_version": "v2",
+                            "enable_words": false
+                        ],
+                        "data_channel": "rtm"
                     ],
                     "turn_detection": [
                         "mode": "default",
                         "config": [
-                            "speech_threshold": "0.6",
-                            "start_of_speech": [
-                                "model": "vad",
-                                "vad_config": [
-                                    "interrupt_duration_ms": 500,
-                                    "prefix_padding_ms": 800,
-                                    "speaking_interrupt_duration_ms": 300
-                                ]
-                            ],
-                            "end_of_speech": [
-                                "model": "semantic",
-                                "semantic_config": [
-                                    "max_wait_ms": 1200,
-                                    "pause_state_enabled": false,
-                                    "silence_duration_ms": 480
-                                ]
-                            ]
+                            "speech_threshold": 0.6,
+                            "start_of_speech": startOfSpeechConfig(for: sosDetectionMode),
+                            "end_of_speech": endOfSpeechConfig(for: eosDetectionMode)
                         ]
                     ]
                 ] as [String: Any]
             ]
-            AgentManager.startAgent(parameter: parameter, token: self.authToken) { agentId, error in
+            AgentManager.startAgent(parameter: parameter, token: self.agentToken) { agentId, error in
                 if let error = error {
                     self.addDebugMessage("Agent start failed")
                     continuation.resume(throwing: NSError(domain: "startAgent", code: -1, userInfo: [NSLocalizedDescriptionKey: error.localizedDescription]))
@@ -632,11 +683,13 @@ class ViewController: UIViewController {
     private func switchToChatView() {
         connectionStartView.isHidden = true
         chatSessionView.setControlsVisible(true)
+        refreshTurnDetectionUI()
     }
     
     private func switchToConfigView() {
         connectionStartView.isHidden = false
         chatSessionView.setControlsVisible(false)
+        refreshTurnDetectionUI()
     }
     
     private func resetConnectionState() {
@@ -657,19 +710,16 @@ class ViewController: UIViewController {
         switchToConfigView()
         startupState.reset()
         connectionStartView.update(for: .ready)
+        refreshTurnDetectionUI()
         
         transcripts.removeAll()
         chatSessionView.tableView.reloadData()
         isMicMuted = false
-        isLoading = false
-        isError = false
-        initializationError = nil
         currentAgentState = .idle
         chatSessionView.updateStatusView(state: .idle)
         agentId = ""
         token = ""
         agentToken = ""
-        authToken = ""
     }
     
     // MARK: - UI Updates
@@ -678,6 +728,39 @@ class ViewController: UIViewController {
     }
     
     // MARK: - Actions
+    @objc private func settingsButtonTapped() {
+        let settingsViewController = TurnDetectionSettingsViewController(
+            sosMode: sosDetectionMode,
+            eosMode: eosDetectionMode,
+            canChangeTurnDetectionMode: canChangeTurnDetectionMode,
+            onSosModeChanged: { [weak self] mode in
+                self?.setSosDetectionMode(mode)
+            },
+            onEosModeChanged: { [weak self] mode in
+                self?.setEosDetectionMode(mode)
+            }
+        )
+        present(settingsViewController, animated: true)
+    }
+
+    private func setSosDetectionMode(_ mode: TurnDetectionMode) {
+        guard canChangeTurnDetectionMode else {
+            addDebugMessage("Turn detection mode cannot be changed after startup")
+            return
+        }
+        sosDetectionMode = mode
+        refreshTurnDetectionUI()
+    }
+
+    private func setEosDetectionMode(_ mode: TurnDetectionMode) {
+        guard canChangeTurnDetectionMode else {
+            addDebugMessage("Turn detection mode cannot be changed after startup")
+            return
+        }
+        eosDetectionMode = mode
+        refreshTurnDetectionUI()
+    }
+
     @objc private func startButtonTapped() {
         guard validateConfiguration() else { return }
         initializeEnginesIfNeeded()
@@ -686,13 +769,14 @@ class ViewController: UIViewController {
             addDebugMessage("Start ignored: session is already connecting")
             return
         }
+        refreshTurnDetectionUI()
 
         Task { @MainActor in
             let granted = await ensureMicrophonePermission()
             guard granted else {
                 startupState.markFailed()
-                isError = true
                 connectionStartView.update(for: .error)
+                refreshTurnDetectionUI()
                 return
             }
 
@@ -706,12 +790,59 @@ class ViewController: UIViewController {
         chatSessionView.updateMicButtonState(isMuted: isMicMuted)
         rtcEngine?.adjustRecordingSignalVolume(isMicMuted ? 0 : 100)
     }
+
+    @objc private func manualSosButtonTapped() {
+        guard isManualSosEnabled else {
+            addDebugMessage("Manual SOS publish failed error=Manual SOS is disabled for this session")
+            return
+        }
+        publishManualTurn(action: .sos)
+    }
+
+    @objc private func manualEosButtonTapped() {
+        guard isManualEosEnabled else {
+            addDebugMessage("Manual EOS publish failed error=Manual EOS is disabled for this session")
+            return
+        }
+        publishManualTurn(action: .eos)
+    }
+
+    private func publishManualTurn(action: ManualTurnDemoUI.Action) {
+        guard let convoAIAPI = convoAIAPI else {
+            addDebugMessage("Manual \(action.label) publish failed error=ConversationalAIAPI is not ready")
+            return
+        }
+
+        let completion: (String, ConversationalAIAPIError?) -> Void = { [weak self] requestId, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self?.addDebugMessage(ManualTurnDemoUI.formatPublishFailureLog(action: action, requestId: requestId, errorMessage: error.message))
+                } else {
+                    self?.addDebugMessage(ManualTurnDemoUI.formatPublishLog(action: action, requestId: requestId))
+                }
+            }
+        }
+
+        switch action {
+        case .sos:
+            guard let manualSOS = convoAIAPI.manualSOS else {
+                addDebugMessage("Manual SOS publish failed error=manualSOS is not supported")
+                return
+            }
+            manualSOS("\(agentUid)", completion)
+        case .eos:
+            guard let manualEOS = convoAIAPI.manualEOS else {
+                addDebugMessage("Manual EOS publish failed error=manualEOS is not supported")
+                return
+            }
+            manualEOS("\(agentUid)", completion)
+        }
+    }
     
     @objc private func endCall() {
         let activeAgentId = agentId
-        let restAuthToken = authToken
         if !activeAgentId.isEmpty {
-            AgentManager.stopAgent(agentId: activeAgentId, token: restAuthToken) { [weak self] error in
+            AgentManager.stopAgent(agentId: activeAgentId, token: agentToken) { [weak self] error in
                 if error == nil {
                     self?.addDebugMessage("Agent stopped successfully")
                 }
@@ -868,6 +999,18 @@ extension ViewController: ConversationalAIAPIEventHandler {
     
     func onAgentError(agentUserId: String, error: ModuleError) {
         addDebugMessage("Agent error: type=\(moduleTypeValue(error.type)), code=\(error.code), msg=\(error.message)")
+    }
+
+    func onUserManualSosEvent(agentUserId: String, event: UserManualSosEvent) {
+        addDebugMessage(ManualTurnDemoUI.formatUserResultLog(action: .sos, payload: event.payload))
+    }
+
+    func onUserManualEosEvent(agentUserId: String, event: UserManualEosEvent) {
+        addDebugMessage(ManualTurnDemoUI.formatUserResultLog(action: .eos, payload: event.payload))
+    }
+
+    func onAgentManualEosEvent(agentUserId: String, event: AgentManualEosEvent) {
+        addDebugMessage(ManualTurnDemoUI.formatAgentEosLog(payload: event.payload))
     }
     
     func onTranscriptUpdated(agentUserId: String, transcript: Transcript) {

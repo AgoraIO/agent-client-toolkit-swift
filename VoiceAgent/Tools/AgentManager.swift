@@ -8,10 +8,10 @@
 import Foundation
 
 class AgentManager {
-    static private var API_BASE_URL = "https://api.agora.io/api/conversational-ai-agent/v2/projects"
+    static private var API_BASE_URL = "https://api-test.agora.io/api/conversational-ai-agent/v2/projects"
 
     static func startAgent(parameter: [String: Any], token: String, completion: ((String?, Error?) -> ())?) {
-        let url = "\(API_BASE_URL)/\(KeyCenter.AG_APP_ID)/join"
+        let url = "\(API_BASE_URL)/\(KeyCenter.APP_ID)/join"
         let headers = generateHeader(token: token)
         
         NetworkManager.shared.postRequest(urlString: url, params: parameter, headers: headers) { response in
@@ -27,7 +27,7 @@ class AgentManager {
     }
     
     static func stopAgent(agentId: String, token: String, completion:((Error?)-> ())?) {
-        let url = "\(API_BASE_URL)/\(KeyCenter.AG_APP_ID)/agents/\(agentId)/leave"
+        let url = "\(API_BASE_URL)/\(KeyCenter.APP_ID)/agents/\(agentId)/leave"
         let header = generateHeader(token: token)
         NetworkManager.shared.postRequest(urlString: url, params: [:], headers: header) { res in
             completion?(nil)

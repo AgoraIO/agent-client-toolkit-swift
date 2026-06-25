@@ -18,7 +18,7 @@ if [[ -z "$VERSION" ]]; then
   VERSION="$(/usr/bin/ruby -e "spec = File.read('AgoraAgentClientToolkit/AgoraAgentClientToolkit.podspec'); puts spec[/s\\.version\\s*=\\s*['\\\"]([^'\\\"]+)/, 1]")"
 fi
 if [[ -z "$VERSION" ]]; then
-  echo "Unable to resolve version. Pass VERSION=1.0.0." >&2
+  echo "Unable to resolve version. Pass VERSION=2.9.0." >&2
   exit 1
 fi
 
@@ -45,7 +45,7 @@ fi
 
 mkdir -p "$PACKAGE_ROOT/$COMPONENT_NAME"
 cp -R "$ROOT_DIR/$COMPONENT_NAME/AgoraAgentClientToolkit" "$PACKAGE_ROOT/$COMPONENT_NAME/"
-for file in README.md README.zh.md; do
+for file in README.md; do
   if [[ -f "$ROOT_DIR/$COMPONENT_NAME/$file" ]]; then
     cp "$ROOT_DIR/$COMPONENT_NAME/$file" "$PACKAGE_ROOT/$COMPONENT_NAME/$file"
   fi
