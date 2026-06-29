@@ -21,7 +21,7 @@ You can override the version for a local packaging run with:
 ```bash
 VERSION=<version> scripts/build_internal_cocoapods_zip.sh
 VERSION=<version> scripts/build_internal_spm_source_zip.sh
-VERSION=<version> scripts/build_internal_spm_binary_zip.sh
+VERSION=<version> scripts/build_rehoboam_swiftpm_input_zip.sh
 ```
 
 ## Package the CocoaPods Release Zip
@@ -80,12 +80,28 @@ AgoraAgentClientToolkit-<version>/
 
 `Package.resolved` is included only when it exists in the repository.
 
-## Package the SwiftPM Binary Zip
+## Package the SwiftPM Rehoboam Input Zip
 
-Use this package shape when the publishing pipeline expects a SwiftPM binary
-artifact. The Rehoboam input is under `swiftpm_template/sdk/AgoraAgentClientToolkit/`.
-The template `Package.swift` must use the `url` / `checksum` placeholders for
-the binary target; do not use a local `path:` binary target in this template.
+Use this package when uploading a SwiftPM release input file to Rehoboam. The
+maintainer-facing command is:
+
+```bash
+VERSION=2.9.0-rc.1 scripts/build_rehoboam_swiftpm_input_zip.sh
+```
+
+The script prints the generated upload file:
+
+```text
+build/internal-spm/AgoraAgentClientToolkit-<version>-rehoboam-<timestamp>/AgoraAgentClientToolkit-<version>-rehoboam-input.zip
+```
+
+Upload that zip to the internal CDN, then paste the uploaded URL into the
+Rehoboam SwiftPM `File URL` field.
+
+Internally, the uploaded zip contains `swiftpm_template/`. Rehoboam uses
+`swiftpm_template/sdk/AgoraAgentClientToolkit/Package.swift` as the input
+manifest, and that manifest must use `url` / `checksum` placeholders for the
+binary target:
 
 ```swift
 .binaryTarget(
@@ -98,12 +114,15 @@ the binary target; do not use a local `path:` binary target in this template.
 The CI input shape must be:
 
 ```text
-sdk/
-`-- AgoraAgentClientToolkit/
-    |-- Package.swift
-    |-- Sources/
-    |   `-- AgoraAgentClientToolkitDependencies/
-    `-- AgoraAgentClientToolkit.xcframework/
+swiftpm_template/
+|-- ci/
+|   `-- build.yaml
+`-- sdk/
+    `-- AgoraAgentClientToolkit/
+        |-- Package.swift
+        |-- Sources/
+        |   `-- AgoraAgentClientToolkitDependencies/
+        `-- AgoraAgentClientToolkit.xcframework/
 ```
 
 The artifact uploaded for SwiftPM must be a zip whose top-level entry is the
@@ -126,24 +145,6 @@ Install demo workspace dependencies first:
 pod install
 ```
 
-Run:
-
-```bash
-VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
-```
-
-The generated zip is written under:
-
-```text
-build/internal-spm/AgoraAgentClientToolkit-<version>-binary-<timestamp>/AgoraAgentClientToolkit.zip
-```
-
-The generated manifest is written under:
-
-```text
-build/internal-spm/AgoraAgentClientToolkit-<version>-binary-<timestamp>/Package.swift
-```
-
 The binary manifest keeps `AgoraAgentClientToolkit` as the public product and
 adds an internal dependency anchor target so SwiftPM resolves Agora RTC and RTM
 alongside the binary framework.
@@ -155,41 +156,14 @@ AgoraRtcEngine_iOS == 4.5.1
 AgoraRTM_iOS == 2.2.8
 ```
 
-Override them only for a deliberate compatibility test:
+Rehoboam validates the uploaded package and the generated SwiftPM package. Its
+release checks must include:
 
 ```bash
-RTC_VERSION=4.5.1 RTM_VERSION=2.2.8 VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
-```
-
-Override the rewritten artifact URL when validating a concrete release path:
-
-```bash
-ARTIFACT_URL=https://.../swiftpm/agent-client-toolkit-swift/2.9.0/AgoraAgentClientToolkit.zip \
-  VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
-```
-
-SwiftPM binary target URLs must use `https://`.
-
-Reuse an existing generated xcframework without archiving again:
-
-```bash
-EXISTING_XCFRAMEWORK=/path/to/AgoraAgentClientToolkit.xcframework \
-  VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
-```
-
-Validate the generated binary package from a clean extraction directory:
-
-```bash
-cd build/internal-spm/AgoraAgentClientToolkit-2.9.0-binary-<timestamp>
-unzip -l AgoraAgentClientToolkit.zip | head
-grep -n "binaryTarget" -A5 Package.swift
+unzip -l dist/AgoraAgentClientToolkit.zip | head
+grep -n "binaryTarget" -A5 dist/Package.swift
+cd dist
 swift package resolve
-```
-
-Or run the same checks through the repository helper:
-
-```bash
-scripts/verify_swiftpm_dist.sh build/internal-spm/AgoraAgentClientToolkit-2.9.0-binary-<timestamp>
 ```
 
 The zip listing must include:
@@ -204,16 +178,10 @@ Run:
 
 ```bash
 scripts/verify_spm.sh
-scripts/verify_swiftpm_template.sh
-scripts/verify_swiftpm_dist.sh <generated-dist-dir>
 ```
 
 `verify_spm.sh` validates the source manifest, resolves package dependencies,
 and builds the `AgoraAgentClientToolkit` scheme for iOS Simulator.
-`verify_swiftpm_template.sh` validates the Rehoboam SwiftPM binary template,
-including the placeholder manifest and expected artifact zip structure.
-`verify_swiftpm_dist.sh` validates the rewritten SwiftPM binary package before
-publishing.
 
 ## Pre-Publish Checklist
 
