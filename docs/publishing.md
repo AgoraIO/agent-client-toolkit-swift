@@ -83,8 +83,42 @@ AgoraAgentClientToolkit-<version>/
 ## Package the SwiftPM Binary Zip
 
 Use this package shape when the publishing pipeline expects a SwiftPM binary
-artifact. The zip root contains `Package.swift` and the binary framework
-directly, matching the internal release guide.
+artifact. The Rehoboam input is under `swiftpm_template/sdk/AgoraAgentClientToolkit/`.
+The template `Package.swift` must use the `url` / `checksum` placeholders for
+the binary target; do not use a local `path:` binary target in this template.
+
+```swift
+.binaryTarget(
+    name: "AgoraAgentClientToolkit",
+    url: "{AgoraAgentClientToolkit_url}",
+    checksum: "{AgoraAgentClientToolkit_checksum}"
+)
+```
+
+The CI input shape must be:
+
+```text
+sdk/
+`-- AgoraAgentClientToolkit/
+    |-- Package.swift
+    |-- Sources/
+    |   `-- AgoraAgentClientToolkitDependencies/
+    `-- AgoraAgentClientToolkit.xcframework/
+```
+
+The artifact uploaded for SwiftPM must be a zip whose top-level entry is the
+xcframework directory itself:
+
+```text
+AgoraAgentClientToolkit.zip
+`-- AgoraAgentClientToolkit.xcframework/
+    |-- Info.plist
+    `-- ...
+```
+
+The final GitHub repository should contain the rewritten `Package.swift` and
+the `Sources/AgoraAgentClientToolkitDependencies/` wrapper target. It should
+not contain the `.xcframework` directory or the zip artifact.
 
 Install demo workspace dependencies first:
 
@@ -101,17 +135,13 @@ VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
 The generated zip is written under:
 
 ```text
-build/internal-spm/AgoraAgentClientToolkit-<version>-binary-<timestamp>/AgoraAgentClientToolkit-<version>-spm-binary.zip
+build/internal-spm/AgoraAgentClientToolkit-<version>-binary-<timestamp>/AgoraAgentClientToolkit.zip
 ```
 
-The zip contains:
+The generated manifest is written under:
 
 ```text
-Package.swift
-README.md
-Sources/
-`-- AgoraAgentClientToolkitDependencies/
-AgoraAgentClientToolkit.xcframework/
+build/internal-spm/AgoraAgentClientToolkit-<version>-binary-<timestamp>/Package.swift
 ```
 
 The binary manifest keeps `AgoraAgentClientToolkit` as the public product and
@@ -131,21 +161,41 @@ Override them only for a deliberate compatibility test:
 RTC_VERSION=4.5.1 RTM_VERSION=2.2.8 VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
 ```
 
+Override the rewritten artifact URL when validating a concrete release path:
+
+```bash
+ARTIFACT_URL=https://.../swiftpm/agent-client-toolkit-swift/2.9.0/AgoraAgentClientToolkit.zip \
+  VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
+```
+
+SwiftPM binary target URLs must use `https://`.
+
+Reuse an existing generated xcframework without archiving again:
+
+```bash
+EXISTING_XCFRAMEWORK=/path/to/AgoraAgentClientToolkit.xcframework \
+  VERSION=2.9.0 scripts/build_internal_spm_binary_zip.sh
+```
+
 Validate the generated binary package from a clean extraction directory:
 
 ```bash
-rm -rf /private/tmp/AgoraAgentClientToolkit-spm-binary-verify
-mkdir -p /private/tmp/AgoraAgentClientToolkit-spm-binary-verify
-unzip -q build/internal-spm/AgoraAgentClientToolkit-2.9.0-binary-<timestamp>/AgoraAgentClientToolkit-2.9.0-spm-binary.zip \
-  -d /private/tmp/AgoraAgentClientToolkit-spm-binary-verify
-cd /private/tmp/AgoraAgentClientToolkit-spm-binary-verify
-swift package dump-package >/dev/null
-xcodebuild build \
-  -scheme agent-client-toolkit-swift \
-  -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath /private/tmp/AgoraAgentClientToolkit-spm-binary-verify/DerivedData \
-  CODE_SIGNING_ALLOWED=NO \
-  -quiet
+cd build/internal-spm/AgoraAgentClientToolkit-2.9.0-binary-<timestamp>
+unzip -l AgoraAgentClientToolkit.zip | head
+grep -n "binaryTarget" -A5 Package.swift
+swift package resolve
+```
+
+Or run the same checks through the repository helper:
+
+```bash
+scripts/verify_swiftpm_dist.sh build/internal-spm/AgoraAgentClientToolkit-2.9.0-binary-<timestamp>
+```
+
+The zip listing must include:
+
+```text
+AgoraAgentClientToolkit.xcframework/Info.plist
 ```
 
 ## Validate SwiftPM
@@ -154,9 +204,16 @@ Run:
 
 ```bash
 scripts/verify_spm.sh
+scripts/verify_swiftpm_template.sh
+scripts/verify_swiftpm_dist.sh <generated-dist-dir>
 ```
 
-This validates the manifest, resolves package dependencies, and builds the `AgoraAgentClientToolkit` scheme for iOS Simulator.
+`verify_spm.sh` validates the source manifest, resolves package dependencies,
+and builds the `AgoraAgentClientToolkit` scheme for iOS Simulator.
+`verify_swiftpm_template.sh` validates the Rehoboam SwiftPM binary template,
+including the placeholder manifest and expected artifact zip structure.
+`verify_swiftpm_dist.sh` validates the rewritten SwiftPM binary package before
+publishing.
 
 ## Pre-Publish Checklist
 
@@ -168,6 +225,9 @@ This validates the manifest, resolves package dependencies, and builds the `Agor
 6. SwiftPM source dependencies are `AgoraRtcEngine_iOS >= 4.5.1` and `AgoraRTM_iOS >= 2.2.8`.
 7. The CocoaPods zip includes `AgoraAgentClientToolkit.podspec` and `AgoraAgentClientToolkit.xcframework`.
 8. The SwiftPM source zip includes `Package.swift` and component source files.
-9. The SwiftPM binary zip includes root `Package.swift` and root `AgoraAgentClientToolkit.xcframework`.
-10. SwiftPM binary dependencies are pinned to `AgoraRtcEngine_iOS == 4.5.1` and `AgoraRTM_iOS == 2.2.8`.
-11. Public README files contain only developer-facing installation and usage instructions.
+9. `swiftpm_template/sdk/AgoraAgentClientToolkit/Package.swift` uses `.binaryTarget(name:url:checksum:)` placeholders, not `path:`.
+10. The SwiftPM binary artifact zip contains root `AgoraAgentClientToolkit.xcframework/Info.plist`.
+11. The rewritten SwiftPM binary `Package.swift` contains the artifact URL and SHA-256 checksum, not placeholders and not `path:`.
+12. `swift package resolve` passes from the rewritten SwiftPM binary package directory.
+13. SwiftPM binary dependencies are pinned to `AgoraRtcEngine_iOS == 4.5.1` and `AgoraRTM_iOS == 2.2.8`.
+14. Public README files contain only developer-facing installation and usage instructions.
