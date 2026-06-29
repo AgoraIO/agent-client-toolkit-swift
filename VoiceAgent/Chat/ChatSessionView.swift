@@ -14,6 +14,10 @@ class ChatSessionView: UIView {
     private let transcriptCardView = UIView()
     let tableView = UITableView()
     let statusView = AgentStateView()
+    let realtimeDataToggleControl = UIControl()
+    let realtimeDataSwitch = UISwitch()
+    private let realtimeDataLabel = UILabel()
+    private let interruptPanelView = UIView()
     private let capabilityPanelView = UIView()
     private let capabilityTitleLabel = UILabel()
     private let manualActionStackView = UIStackView()
@@ -21,7 +25,9 @@ class ChatSessionView: UIView {
     private var capabilityPanelHeightConstraint: Constraint?
     let manualSosButton = UIButton(type: .system)
     let manualEosButton = UIButton(type: .system)
+    let interruptButton = UIButton(type: .system)
     let micButton = UIButton(type: .custom)
+    let chatButton = UIButton(type: .custom)
     let endCallButton = UIButton(type: .custom)
 
     // MARK: - Initialization
@@ -39,11 +45,10 @@ class ChatSessionView: UIView {
     private func setupUI() {
         backgroundColor = .clear
 
-        transcriptCardView.backgroundColor = AppColors.bgCard
-        transcriptCardView.layer.cornerRadius = 12
-        transcriptCardView.layer.borderWidth = 1
-        transcriptCardView.layer.borderColor = AppColors.borderDefault.cgColor
-        transcriptCardView.clipsToBounds = true
+        transcriptCardView.backgroundColor = .clear
+        transcriptCardView.layer.cornerRadius = 0
+        transcriptCardView.layer.borderWidth = 0
+        transcriptCardView.clipsToBounds = false
         addSubview(transcriptCardView)
 
         tableView.separatorStyle = .none
@@ -52,6 +57,26 @@ class ChatSessionView: UIView {
         tableView.scrollIndicatorInsets = tableView.contentInset
         tableView.register(TranscriptMessageCell.self, forCellReuseIdentifier: TranscriptMessageCell.reuseIdentifier)
         transcriptCardView.addSubview(tableView)
+
+        realtimeDataToggleControl.backgroundColor = AppColors.bgControlBar
+        realtimeDataToggleControl.layer.cornerRadius = 12
+        realtimeDataToggleControl.layer.borderWidth = 1
+        realtimeDataToggleControl.layer.borderColor = AppColors.borderDefault.cgColor
+        transcriptCardView.addSubview(realtimeDataToggleControl)
+
+        realtimeDataLabel.text = "Real-time Data"
+        realtimeDataLabel.textColor = AppColors.textSubtitle
+        realtimeDataLabel.font = .systemFont(ofSize: 10, weight: .regular)
+        realtimeDataLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        realtimeDataToggleControl.addSubview(realtimeDataLabel)
+
+        realtimeDataSwitch.isOn = true
+        realtimeDataSwitch.onTintColor = AppColors.accentBlue
+        realtimeDataSwitch.thumbTintColor = .white
+        realtimeDataSwitch.backgroundColor = AppColors.bgTertiary
+        realtimeDataSwitch.layer.cornerRadius = 8
+        realtimeDataSwitch.transform = CGAffineTransform(scaleX: 0.55, y: 0.55)
+        realtimeDataToggleControl.addSubview(realtimeDataSwitch)
 
         capabilityPanelView.backgroundColor = AppColors.bgControlBar
         transcriptCardView.addSubview(capabilityPanelView)
@@ -74,26 +99,41 @@ class ChatSessionView: UIView {
         capabilityPanelView.isHidden = true
 
         transcriptCardView.addSubview(statusView)
+        transcriptCardView.addSubview(interruptPanelView)
+
+        interruptPanelView.backgroundColor = .clear
+        interruptPanelView.isHidden = true
+
+        configureFloatingInterruptButton(interruptButton)
+        interruptPanelView.addSubview(interruptButton)
 
         controlBarView.axis = .horizontal
-        controlBarView.alignment = .fill
-        controlBarView.distribution = .fill
-        controlBarView.spacing = 24
+        controlBarView.alignment = .center
+        controlBarView.distribution = .equalSpacing
+        controlBarView.spacing = 0
+        controlBarView.layoutMargins = UIEdgeInsets(top: 8, left: 42, bottom: 8, right: 42)
+        controlBarView.isLayoutMarginsRelativeArrangement = true
         addSubview(controlBarView)
 
-        micButton.setImage(UIImage(systemName: "mic.fill")?.withRenderingMode(.alwaysTemplate), for: .normal)
-        micButton.tintColor = AppColors.micNormalIcon
-        micButton.backgroundColor = AppColors.micNormalBg
-        micButton.layer.cornerRadius = 28
-        micButton.clipsToBounds = true
+        configureRoundControlButton(
+            micButton,
+            imageName: "mic.fill",
+            tintColor: AppColors.micNormalIcon
+        )
         controlBarView.addArrangedSubview(micButton)
 
-        endCallButton.setTitle("Stop", for: .normal)
-        endCallButton.setTitleColor(.white, for: .normal)
-        endCallButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .bold)
-        endCallButton.backgroundColor = AppColors.btnStopBg
-        endCallButton.layer.cornerRadius = 8
-        endCallButton.clipsToBounds = true
+        configureRoundControlButton(
+            chatButton,
+            imageName: "message",
+            tintColor: .white
+        )
+        controlBarView.addArrangedSubview(chatButton)
+
+        configureRoundControlButton(
+            endCallButton,
+            imageName: "xmark",
+            tintColor: AppColors.errorRedLight
+        )
         controlBarView.addArrangedSubview(endCallButton)
     }
 
@@ -107,26 +147,47 @@ class ChatSessionView: UIView {
         button.heightAnchor.constraint(equalToConstant: 44).isActive = true
     }
 
+    private func configureFloatingInterruptButton(_ button: UIButton) {
+        button.setTitle("Interrupt", for: .normal)
+        button.setTitleColor(AppColors.textSubtitle, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 13, weight: .bold)
+        button.backgroundColor = UIColor(hex: 0x334155, alpha: 0.6)
+        button.layer.cornerRadius = 8
+        button.layer.borderWidth = 1
+        button.layer.borderColor = AppColors.borderDefault.cgColor
+        button.clipsToBounds = true
+    }
+
+    private func configureRoundControlButton(_ button: UIButton, imageName: String, tintColor: UIColor) {
+        button.setImage(UIImage(systemName: imageName)?.withRenderingMode(.alwaysTemplate), for: .normal)
+        button.tintColor = tintColor
+        button.backgroundColor = AppColors.micNormalBg
+        button.layer.cornerRadius = 32
+        button.clipsToBounds = true
+        button.imageView?.contentMode = .scaleAspectFit
+    }
+
     private func setupConstraints() {
         controlBarView.snp.makeConstraints { make in
             make.left.right.bottom.equalToSuperview()
-            make.height.equalTo(56)
+            make.height.equalTo(80)
         }
 
         micButton.snp.makeConstraints { make in
-            make.width.height.equalTo(56)
+            make.width.height.equalTo(64)
+        }
+
+        chatButton.snp.makeConstraints { make in
+            make.width.height.equalTo(64)
         }
 
         endCallButton.snp.makeConstraints { make in
-            make.height.equalTo(56)
+            make.width.height.equalTo(64)
         }
-
-        endCallButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        endCallButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         transcriptCardView.snp.makeConstraints { make in
             make.top.left.right.equalToSuperview()
-            make.bottom.equalTo(controlBarView.snp.top).offset(-16)
+            make.bottom.equalTo(controlBarView.snp.top).offset(-8)
         }
 
         capabilityPanelView.snp.makeConstraints { make in
@@ -144,15 +205,46 @@ class ChatSessionView: UIView {
             make.height.equalTo(44)
         }
 
+        realtimeDataToggleControl.snp.makeConstraints { make in
+            make.centerY.equalTo(statusView)
+            make.right.equalToSuperview().inset(4)
+            make.height.equalTo(24)
+        }
+
+        realtimeDataLabel.snp.makeConstraints { make in
+            make.left.equalToSuperview().offset(8)
+            make.centerY.equalToSuperview()
+        }
+
+        realtimeDataSwitch.snp.makeConstraints { make in
+            make.left.equalTo(realtimeDataLabel.snp.right).offset(4)
+            make.right.equalToSuperview().inset(2)
+            make.centerY.equalToSuperview()
+        }
+
         tableView.snp.makeConstraints { make in
-            make.top.equalTo(capabilityPanelView.snp.bottom)
+            make.top.equalTo(statusView.snp.bottom).offset(2)
             make.left.right.equalToSuperview()
-            make.bottom.equalTo(statusView.snp.top)
+            make.bottom.equalToSuperview()
         }
 
         statusView.snp.makeConstraints { make in
+            make.top.equalTo(capabilityPanelView.snp.bottom).offset(2)
+            make.left.equalToSuperview().offset(4)
+            make.right.equalTo(realtimeDataToggleControl.snp.left).offset(-8)
+            make.height.equalTo(36)
+        }
+
+        interruptPanelView.snp.makeConstraints { make in
             make.left.right.bottom.equalToSuperview()
-            make.height.equalTo(45)
+            make.height.equalTo(58)
+        }
+
+        interruptButton.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.bottom.equalToSuperview().inset(10)
+            make.width.equalTo(128)
+            make.height.equalTo(38)
         }
     }
 
@@ -170,6 +262,9 @@ class ChatSessionView: UIView {
 
     func setControlsVisible(_ visible: Bool) {
         controlBarView.isHidden = !visible
+        interruptPanelView.isHidden = !visible
+        tableView.contentInset.bottom = visible ? 58 : 0
+        tableView.scrollIndicatorInsets = tableView.contentInset
     }
 
     func updateManualActions(isManualSosEnabled: Bool, isManualEosEnabled: Bool, isConnected: Bool) {
@@ -180,6 +275,12 @@ class ChatSessionView: UIView {
         manualEosButton.isHidden = !shouldShowPanel || !isManualEosEnabled
         manualSosButton.isEnabled = shouldShowPanel && isManualSosEnabled
         manualEosButton.isEnabled = shouldShowPanel && isManualEosEnabled
+    }
+
+    func setRealtimeDataVisible(_ visible: Bool) {
+        if realtimeDataSwitch.isOn != visible {
+            realtimeDataSwitch.setOn(visible, animated: false)
+        }
     }
 
     // UIKit may reset the table background color to a system dynamic color during layout.

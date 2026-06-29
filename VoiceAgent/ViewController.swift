@@ -12,6 +12,212 @@ import AgoraRtmKit
 import AgoraAgentClientToolkit
 import AVFAudio
 
+private enum ChatMessageComposerMode {
+    case text
+    case image
+}
+
+private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
+    private let titleLabel = UILabel()
+    private let headerStackView = UIStackView()
+    private let textModeButton = UIButton(type: .system)
+    private let imageModeButton = UIButton(type: .system)
+    private let inputRowView = UIStackView()
+    private let inputTextField = UITextField()
+    private let sendButton = UIButton(type: .system)
+
+    private var mode: ChatMessageComposerMode = .text
+    var onSend: ((ChatMessageComposerMode, String) -> Bool)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+        setupConstraints()
+        applyMode(.text)
+        isHidden = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = AppColors.bgSecondary
+        layer.cornerRadius = 16
+        layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        clipsToBounds = true
+
+        headerStackView.axis = .horizontal
+        headerStackView.alignment = .center
+        headerStackView.distribution = .fill
+        headerStackView.spacing = 8
+        addSubview(headerStackView)
+
+        titleLabel.text = "Chat"
+        titleLabel.textColor = AppColors.textTitle
+        titleLabel.font = .systemFont(ofSize: 16, weight: .bold)
+        titleLabel.setContentHuggingPriority(.required, for: .horizontal)
+        headerStackView.addArrangedSubview(titleLabel)
+
+        configureModeButton(textModeButton, title: "Text", imageName: "message")
+        configureModeButton(imageModeButton, title: "Image URL", imageName: "photo")
+        headerStackView.addArrangedSubview(textModeButton)
+        headerStackView.addArrangedSubview(imageModeButton)
+
+        inputRowView.axis = .horizontal
+        inputRowView.alignment = .fill
+        inputRowView.distribution = .fill
+        inputRowView.spacing = 10
+        addSubview(inputRowView)
+
+        configureInputField(inputTextField)
+        inputTextField.delegate = self
+        inputRowView.addArrangedSubview(inputTextField)
+
+        configureSendButton(sendButton)
+        inputRowView.addArrangedSubview(sendButton)
+
+        textModeButton.addTarget(self, action: #selector(textModeButtonTapped), for: .touchUpInside)
+        imageModeButton.addTarget(self, action: #selector(imageModeButtonTapped), for: .touchUpInside)
+        sendButton.addTarget(self, action: #selector(sendButtonTapped), for: .touchUpInside)
+    }
+
+    private func configureModeButton(_ button: UIButton, title: String, imageName: String) {
+        button.setTitle(title, for: .normal)
+        button.setImage(UIImage(systemName: imageName)?.withRenderingMode(.alwaysTemplate), for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
+        button.titleLabel?.adjustsFontSizeToFitWidth = true
+        button.titleLabel?.minimumScaleFactor = 0.8
+        button.tintColor = AppColors.textSubtitle
+        button.layer.cornerRadius = 8
+        button.layer.borderWidth = 1
+        button.layer.borderColor = AppColors.borderDefault.cgColor
+        button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        button.imageEdgeInsets = UIEdgeInsets(top: 0, left: -2, bottom: 0, right: 4)
+        button.clipsToBounds = true
+    }
+
+    private func configureInputField(_ textField: UITextField) {
+        textField.backgroundColor = AppColors.bgTertiary
+        textField.textColor = AppColors.textPrimary
+        textField.tintColor = AppColors.accentBlue
+        textField.font = .systemFont(ofSize: 14)
+        textField.returnKeyType = .send
+        textField.layer.cornerRadius = 8
+        textField.layer.borderWidth = 1
+        textField.layer.borderColor = AppColors.borderDefault.cgColor
+        textField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 1))
+        textField.leftViewMode = .always
+        textField.rightView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 1))
+        textField.rightViewMode = .always
+    }
+
+    private func configureSendButton(_ button: UIButton) {
+        button.setTitle("Send", for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .bold)
+        button.backgroundColor = AppColors.btnManualBg
+        button.layer.cornerRadius = 8
+        button.clipsToBounds = true
+    }
+
+    private func setupConstraints() {
+        headerStackView.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(12)
+            make.left.right.equalToSuperview().inset(12)
+            make.height.equalTo(36)
+        }
+
+        textModeButton.snp.makeConstraints { make in
+            make.width.equalTo(82)
+            make.height.equalTo(36)
+        }
+
+        imageModeButton.snp.makeConstraints { make in
+            make.width.equalTo(120)
+            make.height.equalTo(36)
+        }
+
+        inputRowView.snp.makeConstraints { make in
+            make.top.equalTo(headerStackView.snp.bottom).offset(10)
+            make.left.right.equalToSuperview().inset(12)
+            make.height.equalTo(48)
+            make.bottom.equalToSuperview().inset(16)
+        }
+
+        sendButton.snp.makeConstraints { make in
+            make.width.equalTo(72)
+        }
+    }
+
+    private func applyMode(_ newMode: ChatMessageComposerMode) {
+        mode = newMode
+        inputTextField.attributedPlaceholder = NSAttributedString(
+            string: mode == .text ? "Type a message" : "Paste image URL",
+            attributes: [.foregroundColor: AppColors.textTertiary]
+        )
+        inputTextField.keyboardType = mode == .text ? .default : .URL
+        inputTextField.autocapitalizationType = mode == .text ? .sentences : .none
+        inputTextField.autocorrectionType = mode == .text ? .default : .no
+        updateModeButton(textModeButton, selected: mode == .text)
+        updateModeButton(imageModeButton, selected: mode == .image)
+        inputTextField.reloadInputViews()
+    }
+
+    private func updateModeButton(_ button: UIButton, selected: Bool) {
+        button.backgroundColor = selected ? AppColors.accentBlue : AppColors.bgTertiary
+        button.setTitleColor(selected ? .white : AppColors.textSubtitle, for: .normal)
+        button.tintColor = selected ? .white : AppColors.textSubtitle
+    }
+
+    @objc private func textModeButtonTapped() {
+        applyMode(.text)
+    }
+
+    @objc private func imageModeButtonTapped() {
+        applyMode(.image)
+    }
+
+    @objc private func sendButtonTapped() {
+        sendMessage()
+    }
+
+    @discardableResult
+    private func sendMessage() -> Bool {
+        let sent = onSend?(mode, inputTextField.text ?? "") ?? false
+        if sent {
+            hide()
+        }
+        return sent
+    }
+
+    var isPanelVisible: Bool {
+        !isHidden
+    }
+
+    func show() {
+        applyMode(.text)
+        inputTextField.text = ""
+        isHidden = false
+        inputTextField.becomeFirstResponder()
+    }
+
+    func hide() {
+        guard !isHidden else { return }
+        inputTextField.resignFirstResponder()
+        isHidden = true
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        sendMessage()
+        return true
+    }
+
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        isHidden = true
+    }
+}
+
 class ViewController: UIViewController {
     private static let defaultLLMGreetingMessage = "hello man, I am an AI robot, I can do anything for you"
     private static let defaultLLMFailureMessage = "Sorry, I don't know how to answer your question"
@@ -24,23 +230,28 @@ class ViewController: UIViewController {
     private let logCardView = UIView()
     private let connectionStartView = ConnectionStartView()
     private let chatSessionView = ChatSessionView()
+    private let chatInputPanelView = ChatMessageInputPanelView()
     private let debugInfoTextView = UITextView()
     
     // MARK: - State
     private let uid = Int.random(in: 1000...9999999)
     private var channel: String = ""
-    private var transcripts: [Transcript] = []
+    private var transcriptItems: [TranscriptItem] = []
+    private var pendingTurnLatencyMetrics: [Int: TurnLatencyMetrics] = [:]
+    private var isLatencyMetricsVisible: Bool = true
     private var isMicMuted: Bool = false
     private var currentAgentState: AgentState = .unknown
     private var startupState = SessionStartupState()
     private var sosDetectionMode: TurnDetectionMode = .vad
     private var eosDetectionMode: TurnDetectionMode = .semantic
     private var rtcJoinContinuation: CheckedContinuation<Void, Error>?
+    private var joiningChannel: String?
     private var debugLogList: [String] = []
     
     // MARK: - Agora Components
     private var token: String = ""
     private var agentToken: String = ""
+    private var authToken: String = ""
     private var agentId: String = ""
     private var rtcEngine: AgoraRtcEngineKit?
     private var rtmEngine: AgoraRtmClientKit?
@@ -119,6 +330,15 @@ class ViewController: UIViewController {
         }
     }
 
+    private func chatMessageTypeValue(_ type: ChatMessageType) -> String {
+        switch type {
+        case .text: return "text"
+        case .image: return "picture"
+        case .unknown: return "unknown"
+        @unknown default: return "unknown"
+        }
+    }
+
     private var isManualSosEnabled: Bool {
         sosDetectionMode == .manual
     }
@@ -157,7 +377,7 @@ class ViewController: UIViewController {
         guard missingKeys.isEmpty else {
             let message = "Missing Agora configuration: \(missingKeys.joined(separator: ", "))"
             addDebugMessage(message)
-            connectionStartView.update(for: .error)
+            connectionStartView.update(for: .ready)
             showErrorToast(message)
             return false
         }
@@ -225,10 +445,15 @@ class ViewController: UIViewController {
         chatSessionView.tableView.delegate = self
         chatSessionView.tableView.dataSource = self
         chatSessionView.applyTableBackgroundWorkaround()
+        chatSessionView.interruptButton.addTarget(self, action: #selector(interruptButtonTapped), for: .touchUpInside)
         chatSessionView.micButton.addTarget(self, action: #selector(toggleMicrophone), for: .touchUpInside)
+        chatSessionView.chatButton.addTarget(self, action: #selector(chatButtonTapped), for: .touchUpInside)
         chatSessionView.manualSosButton.addTarget(self, action: #selector(manualSosButtonTapped), for: .touchUpInside)
         chatSessionView.manualEosButton.addTarget(self, action: #selector(manualEosButtonTapped), for: .touchUpInside)
         chatSessionView.endCallButton.addTarget(self, action: #selector(endCall), for: .touchUpInside)
+        chatSessionView.realtimeDataToggleControl.addTarget(self, action: #selector(realtimeDataToggleTapped), for: .touchUpInside)
+        chatSessionView.realtimeDataSwitch.addTarget(self, action: #selector(realtimeDataSwitchChanged), for: .valueChanged)
+        chatSessionView.setRealtimeDataVisible(isLatencyMetricsVisible)
         chatSessionView.updateStatusView(state: .idle)
         chatSessionView.setControlsVisible(false)
         refreshTurnDetectionUI()
@@ -236,6 +461,16 @@ class ViewController: UIViewController {
         view.addSubview(connectionStartView)
         connectionStartView.startButton.addTarget(self, action: #selector(startButtonTapped), for: .touchUpInside)
         connectionStartView.update(for: .ready)
+
+        view.addSubview(chatInputPanelView)
+        chatInputPanelView.onSend = { [weak self] mode, input in
+            switch mode {
+            case .text:
+                return self?.sendTextMessage(input) ?? false
+            case .image:
+                return self?.sendImageUrlMessage(input) ?? false
+            }
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -282,6 +517,11 @@ class ViewController: UIViewController {
             make.left.right.equalToSuperview().inset(16)
             make.bottom.equalTo(view.safeAreaLayoutGuide).offset(-16)
             make.height.equalTo(56)
+        }
+
+        chatInputPanelView.snp.makeConstraints { make in
+            make.left.right.equalToSuperview()
+            make.bottom.equalTo(view.keyboardLayoutGuide.snp.top)
         }
     }
     
@@ -369,7 +609,10 @@ class ViewController: UIViewController {
                 // 5. Generate the agent token
                 try await generateAgentToken()
 
-                // 6. Start the agent
+                // 6. Generate the REST auth token
+                try await generateAuthToken()
+
+                // 7. Start the agent
                 try await startAgent()
                 
                 await MainActor.run {
@@ -380,10 +623,10 @@ class ViewController: UIViewController {
             } catch {
                 await MainActor.run {
                     cleanupAfterConnectionFailure()
-                    startupState.markFailed()
+                    startupState.reset()
                     refreshTurnDetectionUI()
                     hideLoadingToast()
-                    connectionStartView.update(for: .error)
+                    connectionStartView.update(for: .ready)
                     showErrorToast(error.localizedDescription)
                 }
             }
@@ -394,12 +637,13 @@ class ViewController: UIViewController {
     private func cleanupAfterConnectionFailure() {
         rtcJoinContinuation?.resume(throwing: NSError(domain: "joinRTCChannel", code: -999, userInfo: [NSLocalizedDescriptionKey: "RTC join cancelled"]))
         rtcJoinContinuation = nil
+        joiningChannel = nil
         rtcEngine?.leaveChannel()
         convoAIAPI?.unsubscribeMessage(channelName: channel) { _ in }
         rtmEngine?.logout { _, _ in }
         token = ""
         agentToken = ""
-        agentId = ""
+        authToken = ""
     }
 
     @MainActor
@@ -457,6 +701,21 @@ class ViewController: UIViewController {
             }
         }
     }
+
+    private func generateAuthToken() async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            NetworkManager.shared.generateToken(channelName: channel, uid: "\(agentUid)", types: [.rtc, .rtm]) { token in
+                guard let token = token else {
+                    self.addDebugMessage("Generate auth token failed")
+                    continuation.resume(throwing: NSError(domain: "generateAuthToken", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get auth token. Please try again."]))
+                    return
+                }
+                self.authToken = token
+                self.addDebugMessage("Generate auth token successfully")
+                continuation.resume()
+            }
+        }
+    }
     
     // MARK: - Channel Connection
     @MainActor
@@ -503,8 +762,10 @@ class ViewController: UIViewController {
         options.publishMicrophoneTrack = true
         options.autoSubscribeAudio = true
         options.autoSubscribeVideo = false
+        joiningChannel = channel
         let result = rtcEngine.joinChannel(byToken: token, channelId: channel, uid: UInt(uid), mediaOptions: options)
         if result != 0 {
+            joiningChannel = nil
             addDebugMessage("Rtc joinChannel failed ret: \(result)")
             throw NSError(domain: "joinRTCChannel", code: Int(result), userInfo: [NSLocalizedDescriptionKey: "Failed to join RTC channel. Error code: \(result)"])
         } else {
@@ -659,7 +920,7 @@ class ViewController: UIViewController {
                     ]
                 ] as [String: Any]
             ]
-            AgentManager.startAgent(parameter: parameter, token: self.agentToken) { agentId, error in
+            AgentManager.startAgent(parameter: parameter, token: self.authToken) { agentId, error in
                 if let error = error {
                     self.addDebugMessage("Agent start failed")
                     continuation.resume(throwing: NSError(domain: "startAgent", code: -1, userInfo: [NSLocalizedDescriptionKey: error.localizedDescription]))
@@ -688,6 +949,7 @@ class ViewController: UIViewController {
     
     private func switchToConfigView() {
         connectionStartView.isHidden = false
+        chatInputPanelView.hide()
         chatSessionView.setControlsVisible(false)
         refreshTurnDetectionUI()
     }
@@ -706,13 +968,15 @@ class ViewController: UIViewController {
                 print("[VoiceAgent] ConvoAI unsubscribe failed: \(error.message)")
             }
         })
+        joiningChannel = nil
         
         switchToConfigView()
         startupState.reset()
         connectionStartView.update(for: .ready)
         refreshTurnDetectionUI()
         
-        transcripts.removeAll()
+        transcriptItems.removeAll()
+        pendingTurnLatencyMetrics.removeAll()
         chatSessionView.tableView.reloadData()
         isMicMuted = false
         currentAgentState = .idle
@@ -720,6 +984,7 @@ class ViewController: UIViewController {
         agentId = ""
         token = ""
         agentToken = ""
+        authToken = ""
     }
     
     // MARK: - UI Updates
@@ -774,8 +1039,8 @@ class ViewController: UIViewController {
         Task { @MainActor in
             let granted = await ensureMicrophonePermission()
             guard granted else {
-                startupState.markFailed()
-                connectionStartView.update(for: .error)
+                startupState.reset()
+                connectionStartView.update(for: .ready)
                 refreshTurnDetectionUI()
                 return
             }
@@ -789,6 +1054,22 @@ class ViewController: UIViewController {
         isMicMuted.toggle()
         chatSessionView.updateMicButtonState(isMuted: isMicMuted)
         rtcEngine?.adjustRecordingSignalVolume(isMicMuted ? 0 : 100)
+    }
+
+    @objc private func chatButtonTapped() {
+        guard startupState.phase == .connected else {
+            addDebugMessage("Open chat failed error=Agent is not connected")
+            return
+        }
+        if chatInputPanelView.isPanelVisible {
+            chatInputPanelView.hide()
+        } else {
+            chatInputPanelView.show()
+        }
+    }
+
+    @objc private func interruptButtonTapped() {
+        sendInterrupt()
     }
 
     @objc private func manualSosButtonTapped() {
@@ -805,6 +1086,83 @@ class ViewController: UIViewController {
             return
         }
         publishManualTurn(action: .eos)
+    }
+
+    @objc private func realtimeDataToggleTapped() {
+        isLatencyMetricsVisible.toggle()
+        chatSessionView.setRealtimeDataVisible(isLatencyMetricsVisible)
+        chatSessionView.tableView.reloadData()
+    }
+
+    @objc private func realtimeDataSwitchChanged(_ sender: UISwitch) {
+        isLatencyMetricsVisible = sender.isOn
+        chatSessionView.setRealtimeDataVisible(isLatencyMetricsVisible)
+        chatSessionView.tableView.reloadData()
+    }
+
+    private func sendTextMessage(_ text: String) -> Bool {
+        let content = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else {
+            addDebugMessage("Send text failed error=Text is empty")
+            return false
+        }
+        let message = TextMessage(priority: .interrupt, interruptable: true, text: content)
+        return sendChatMessage(label: "Text", message: message)
+    }
+
+    private func sendImageUrlMessage(_ imageUrl: String) -> Bool {
+        let url = imageUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !url.isEmpty else {
+            addDebugMessage("Send image failed error=Image URL is empty")
+            return false
+        }
+        guard url.hasPrefix("http://") || url.hasPrefix("https://") else {
+            addDebugMessage("Send image failed error=Image URL must start with http:// or https://")
+            return false
+        }
+        let message = ImageMessage(uuid: UUID().uuidString, url: url, base64: nil)
+        return sendChatMessage(label: "Image", message: message)
+    }
+
+    private func sendInterrupt() {
+        guard let convoAIAPI = requireConnectedConvoAIAPI(action: "Interrupt") else { return }
+        convoAIAPI.interrupt(agentUserId: "\(agentUid)") { [weak self] error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self?.addDebugMessage("Interrupt failed error=\(error.message)")
+                } else {
+                    self?.addDebugMessage("Interrupt sent successfully")
+                }
+            }
+        }
+    }
+
+    private func sendChatMessage(label: String, message: ChatMessage) -> Bool {
+        guard let convoAIAPI = requireConnectedConvoAIAPI(action: "Send \(label)") else {
+            return false
+        }
+        convoAIAPI.chat(agentUserId: "\(agentUid)", message: message) { [weak self] error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self?.addDebugMessage("Send \(label) failed error=\(error.message)")
+                } else {
+                    self?.addDebugMessage("Send \(label) successfully")
+                }
+            }
+        }
+        return true
+    }
+
+    private func requireConnectedConvoAIAPI(action: String) -> ConversationalAIAPI? {
+        guard startupState.phase == .connected else {
+            addDebugMessage("\(action) failed error=Agent is not connected")
+            return nil
+        }
+        guard let convoAIAPI = convoAIAPI else {
+            addDebugMessage("\(action) failed error=ConversationalAIAPI is not ready")
+            return nil
+        }
+        return convoAIAPI
     }
 
     private func publishManualTurn(action: ManualTurnDemoUI.Action) {
@@ -842,7 +1200,7 @@ class ViewController: UIViewController {
     @objc private func endCall() {
         let activeAgentId = agentId
         if !activeAgentId.isEmpty {
-            AgentManager.stopAgent(agentId: activeAgentId, token: agentToken) { [weak self] error in
+            AgentManager.stopAgent(agentId: activeAgentId, token: authToken) { [weak self] error in
                 if error == nil {
                     self?.addDebugMessage("Agent stopped successfully")
                 }
@@ -914,12 +1272,17 @@ class ViewController: UIViewController {
 // MARK: - UITableViewDataSource & Delegate
 extension ViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return transcripts.count
+        return transcriptItems.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: TranscriptMessageCell.reuseIdentifier, for: indexPath) as! TranscriptMessageCell
-        cell.configure(with: transcripts[indexPath.row])
+        let item = transcriptItems[indexPath.row]
+        cell.configure(
+            with: item.transcript,
+            latencyMetrics: item.latencyMetrics,
+            isLatencyMetricsVisible: isLatencyMetricsVisible
+        )
         return cell
     }
     
@@ -931,7 +1294,12 @@ extension ViewController: UITableViewDataSource, UITableViewDelegate {
 // MARK: - AgoraRtcEngineDelegate
 extension ViewController: AgoraRtcEngineDelegate {
     func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinChannel channel: String, withUid uid: UInt, elapsed: Int) {
+        guard joiningChannel == channel else {
+            print("[VoiceAgent] Ignore stale RTC join callback, channel: \(channel), joiningChannel: \(joiningChannel ?? "")")
+            return
+        }
         addDebugMessage("Rtc onJoinChannelSuccess, channel:\(channel) uid:\(uid)")
+        joiningChannel = nil
         startupState.markRTCJoined()
         rtcJoinContinuation?.resume()
         rtcJoinContinuation = nil
@@ -978,9 +1346,13 @@ extension ViewController: ConversationalAIAPIEventHandler {
     }
     
     func onMessageError(agentUserId: String, error: MessageError) {
+        addDebugMessage("Message error: type=\(chatMessageTypeValue(error.type)), code=\(error.code), msg=\(error.message)")
     }
     
     func onMessageReceiptUpdated(agentUserId: String, messageReceipt: MessageReceipt) {
+        addDebugMessage(
+            "Message receipt: type=\(chatMessageTypeValue(messageReceipt.messageType)), module=\(moduleTypeValue(messageReceipt.moduleType)), turn=\(messageReceipt.turnId)"
+        )
     }
     
     func onAgentStateChanged(agentUserId: String, event: StateChangeEvent) {
@@ -995,6 +1367,12 @@ extension ViewController: ConversationalAIAPIEventHandler {
     }
     
     func onAgentMetrics(agentUserId: String, metrics: Metric) {
+    }
+
+    func onTurnFinished(agentUserId: String, turn: Turn) {
+        DispatchQueue.main.async { [weak self] in
+            self?.updateTurnLatencyMetrics(turn)
+        }
     }
     
     func onAgentError(agentUserId: String, error: ModuleError) {
@@ -1016,26 +1394,70 @@ extension ViewController: ConversationalAIAPIEventHandler {
     func onTranscriptUpdated(agentUserId: String, transcript: Transcript) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            let latencyMetrics = transcript.type == .agent
+                ? self.pendingTurnLatencyMetrics.removeValue(forKey: transcript.turnId)
+                : nil
             
-            if let index = self.transcripts.firstIndex(where: {
-                $0.turnId == transcript.turnId &&
-                $0.type.rawValue == transcript.type.rawValue &&
-                $0.userId == transcript.userId
+            if let index = self.transcriptItems.firstIndex(where: {
+                $0.transcript.turnId == transcript.turnId &&
+                $0.transcript.type.rawValue == transcript.type.rawValue &&
+                $0.transcript.userId == transcript.userId
             }) {
-                self.transcripts[index] = transcript
+                let existingLatencyMetrics = self.transcriptItems[index].latencyMetrics
+                self.transcriptItems[index] = TranscriptItem(
+                    transcript: transcript,
+                    latencyMetrics: latencyMetrics ?? existingLatencyMetrics
+                )
             } else {
-                self.transcripts.append(transcript)
+                self.transcriptItems.append(TranscriptItem(transcript: transcript, latencyMetrics: latencyMetrics))
             }
             
             self.chatSessionView.tableView.reloadData()
             
-            if !self.transcripts.isEmpty {
-                let indexPath = IndexPath(row: self.transcripts.count - 1, section: 0)
+            if !self.transcriptItems.isEmpty {
+                let indexPath = IndexPath(row: self.transcriptItems.count - 1, section: 0)
                 self.chatSessionView.tableView.scrollToRow(at: indexPath, at: .bottom, animated: true)
             }
         }
     }
+
+    private func updateTurnLatencyMetrics(_ turn: Turn) {
+        let metrics = turn.toLatencyMetrics()
+        if let index = transcriptItems.firstIndex(where: {
+            $0.transcript.turnId == turn.turnId &&
+                $0.transcript.type == .agent
+        }) {
+            transcriptItems[index].latencyMetrics = metrics
+            chatSessionView.tableView.reloadData()
+        } else {
+            pendingTurnLatencyMetrics[turn.turnId] = metrics
+        }
+    }
     
     func onDebugLog(log: String) {
+    }
+}
+
+private extension Turn {
+    func toLatencyMetrics() -> TurnLatencyMetrics {
+        TurnLatencyMetrics(
+            turnId: turnId,
+            e2eLatencyMs: e2eLatency.nonZeroRoundedInt,
+            transportLatencyMs: segmentedLatency.transport.nonZeroRoundedInt,
+            algorithmProcessingLatencyMs: segmentedLatency.algorithmProcessing.nonZeroRoundedInt,
+            asrLatencyMs: segmentedLatency.asrTTLW.nonZeroRoundedInt,
+            llmLatencyMs: segmentedLatency.llmTTFT.nonZeroRoundedInt,
+            ttsLatencyMs: segmentedLatency.ttsTTFB.nonZeroRoundedInt
+        )
+    }
+}
+
+private extension Double {
+    var roundedInt: Int {
+        Int(self.rounded())
+    }
+
+    var nonZeroRoundedInt: Int? {
+        self > 0 ? roundedInt : nil
     }
 }

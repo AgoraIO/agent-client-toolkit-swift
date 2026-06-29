@@ -6,7 +6,6 @@ struct SessionStartupState {
         case awaitingPermission
         case connecting
         case connected
-        case failed
     }
 
     private(set) var phase: Phase = .idle
@@ -14,7 +13,7 @@ struct SessionStartupState {
     private(set) var rtmLoggedIn = false
 
     var canStartConnection: Bool {
-        phase == .idle || phase == .failed
+        phase == .idle
     }
 
     var shouldStartAgent: Bool {
@@ -47,12 +46,6 @@ struct SessionStartupState {
 
     mutating func markConnected() {
         phase = .connected
-    }
-
-    mutating func markFailed() {
-        phase = .failed
-        rtcJoined = false
-        rtmLoggedIn = false
     }
 
     mutating func reset() {

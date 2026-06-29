@@ -24,7 +24,7 @@ class AgentStateView: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = AppColors.bgControlBar
+        backgroundColor = .clear
 
         dotView.backgroundColor = AppColors.stateIdle
         dotView.layer.cornerRadius = 4
@@ -33,7 +33,8 @@ class AgentStateView: UIView {
         statusLabel.text = "Idle"
         statusLabel.textColor = AppColors.stateIdle
         statusLabel.font = .systemFont(ofSize: 13, weight: .bold)
-        statusLabel.textAlignment = .center
+        statusLabel.textAlignment = .left
+        statusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         addSubview(statusLabel)
     }
 
@@ -41,11 +42,13 @@ class AgentStateView: UIView {
         dotView.snp.makeConstraints { make in
             make.width.height.equalTo(8)
             make.centerY.equalToSuperview()
-            make.right.equalTo(statusLabel.snp.left).offset(-8)
+            make.left.equalToSuperview()
         }
 
         statusLabel.snp.makeConstraints { make in
-            make.center.equalToSuperview()
+            make.left.equalTo(dotView.snp.right).offset(8)
+            make.right.lessThanOrEqualToSuperview()
+            make.centerY.equalToSuperview()
         }
     }
 

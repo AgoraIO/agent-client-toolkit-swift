@@ -1,11 +1,13 @@
 import UIKit
 import SnapKit
+import AgoraAgentClientToolkit
 
 final class TurnDetectionSettingsViewController: UIViewController {
     private let titleLabel = UILabel()
     private let dividerTop = UIView()
     private let dividerMiddle = UIView()
     private let dividerBottom = UIView()
+    private let versionLabel = UILabel()
     private let sosLabel = UILabel()
     private let eosLabel = UILabel()
     private let sosSegmentedControl = UISegmentedControl()
@@ -76,6 +78,15 @@ final class TurnDetectionSettingsViewController: UIViewController {
         view.addSubview(sosSegmentedControl)
         view.addSubview(eosSegmentedControl)
 
+        versionLabel.text = "Demo v\(demoVersion)  |  Component v\(ConversationalAIAPIImpl.version)"
+        versionLabel.textColor = AppColors.textTertiary
+        versionLabel.font = .systemFont(ofSize: 12, weight: .regular)
+        versionLabel.textAlignment = .left
+        versionLabel.numberOfLines = 1
+        versionLabel.adjustsFontSizeToFitWidth = true
+        versionLabel.minimumScaleFactor = 0.85
+        view.addSubview(versionLabel)
+
         sosSegmentedControl.addTarget(self, action: #selector(sosSelectionChanged), for: .valueChanged)
         eosSegmentedControl.addTarget(self, action: #selector(eosSelectionChanged), for: .valueChanged)
     }
@@ -110,7 +121,13 @@ final class TurnDetectionSettingsViewController: UIViewController {
     private func setupConstraints() {
         titleLabel.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
-            make.left.right.equalToSuperview().inset(20)
+            make.left.equalToSuperview().inset(20)
+        }
+
+        versionLabel.snp.makeConstraints { make in
+            make.centerY.equalTo(titleLabel)
+            make.left.equalTo(titleLabel.snp.right).offset(8)
+            make.right.equalToSuperview().inset(20)
         }
 
         dividerTop.snp.makeConstraints { make in
@@ -181,6 +198,10 @@ final class TurnDetectionSettingsViewController: UIViewController {
         if let mode {
             onEosModeChanged(mode)
         }
+    }
+
+    private var demoVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
 }
 

@@ -12,7 +12,6 @@ class ConnectionStartView: UIView {
     enum State {
         case ready
         case connecting
-        case error
     }
 
     // MARK: - UI Components
@@ -65,11 +64,6 @@ class ConnectionStartView: UIView {
             startButton.setTitle("Connecting...", for: .normal)
             startButton.setTitleColor(AppColors.btnDisabledText, for: .normal)
             updateButtonState(isEnabled: false)
-        case .error:
-            startButton.setTitle("Retry", for: .normal)
-            startButton.setTitleColor(.white, for: .normal)
-            startButton.isEnabled = true
-            startButton.backgroundColor = AppColors.errorRedDark
         }
     }
 }

@@ -7,18 +7,50 @@ import UIKit
 import SnapKit
 import AgoraAgentClientToolkit
 
+struct TurnLatencyMetrics: Equatable {
+    let turnId: Int
+    let e2eLatencyMs: Int?
+    let transportLatencyMs: Int?
+    let algorithmProcessingLatencyMs: Int?
+    let asrLatencyMs: Int?
+    let llmLatencyMs: Int?
+    let ttsLatencyMs: Int?
+}
+
+struct TranscriptItem: Equatable {
+    var transcript: Transcript
+    var latencyMetrics: TurnLatencyMetrics?
+
+    static func == (lhs: TranscriptItem, rhs: TranscriptItem) -> Bool {
+        lhs.transcript.turnId == rhs.transcript.turnId &&
+            lhs.transcript.userId == rhs.transcript.userId &&
+            lhs.transcript.text == rhs.transcript.text &&
+            lhs.transcript.status == rhs.transcript.status &&
+            lhs.transcript.type == rhs.transcript.type &&
+            lhs.latencyMetrics == rhs.latencyMetrics
+    }
+}
+
+private extension Optional where Wrapped == Int {
+    var latencyText: String {
+        map { "\($0)ms" } ?? "--"
+    }
+}
+
 class TranscriptMessageCell: UITableViewCell {
     static let reuseIdentifier = "TranscriptMessageCell"
 
+    private let speakerRowView = UIStackView()
     private let avatarView = UIView()
     private let avatarLabel = UILabel()
-    private let bubbleView = UIView()
+    private let speakerNameLabel = UILabel()
     private let messageLabel = UILabel()
+    private let latencyContainerView = UIView()
+    private let latencyTurnLabel = UILabel()
+    private let latencySummaryLabel = UILabel()
 
-    private var bubbleLeading: Constraint?
-    private var bubbleTrailing: Constraint?
-    private var avatarLeading: Constraint?
-    private var avatarTrailing: Constraint?
+    private var latencyTop: Constraint?
+    private var latencyHeight: Constraint?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -34,122 +66,135 @@ class TranscriptMessageCell: UITableViewCell {
         backgroundColor = .clear
         contentView.backgroundColor = .clear
 
-        avatarView.layer.cornerRadius = 16
-        contentView.addSubview(avatarView)
+        speakerRowView.axis = .horizontal
+        speakerRowView.alignment = .center
+        speakerRowView.distribution = .fill
+        speakerRowView.spacing = 6
+        contentView.addSubview(speakerRowView)
 
-        avatarLabel.font = .systemFont(ofSize: 11, weight: .semibold)
+        avatarView.layer.cornerRadius = 11
+        avatarView.clipsToBounds = true
+        speakerRowView.addArrangedSubview(avatarView)
+
+        avatarLabel.font = .systemFont(ofSize: 9, weight: .semibold)
         avatarLabel.textColor = .white
         avatarLabel.textAlignment = .center
         avatarView.addSubview(avatarLabel)
 
-        bubbleView.layer.cornerRadius = 16
-        contentView.addSubview(bubbleView)
+        speakerNameLabel.font = .systemFont(ofSize: 13, weight: .bold)
+        speakerNameLabel.textColor = AppColors.textSubtitle
+        speakerNameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        speakerRowView.addArrangedSubview(speakerNameLabel)
 
-        messageLabel.font = .systemFont(ofSize: 14)
+        messageLabel.font = .systemFont(ofSize: 16)
         messageLabel.numberOfLines = 0
-        bubbleView.addSubview(messageLabel)
+        contentView.addSubview(messageLabel)
+
+        latencyContainerView.isHidden = true
+        contentView.addSubview(latencyContainerView)
+
+        latencyTurnLabel.font = .systemFont(ofSize: 10, weight: .medium)
+        latencyTurnLabel.textColor = AppColors.textSecondary
+        latencyTurnLabel.backgroundColor = AppColors.bgTertiary
+        latencyTurnLabel.layer.cornerRadius = 4
+        latencyTurnLabel.clipsToBounds = true
+        latencyTurnLabel.textAlignment = .center
+        latencyContainerView.addSubview(latencyTurnLabel)
+
+        latencySummaryLabel.font = .systemFont(ofSize: 10, weight: .regular)
+        latencySummaryLabel.textColor = AppColors.textTertiary
+        latencySummaryLabel.numberOfLines = 2
+        latencyContainerView.addSubview(latencySummaryLabel)
+
+        speakerRowView.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(6)
+            make.left.right.equalToSuperview().inset(4)
+            make.height.equalTo(24)
+        }
 
         avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(4)
-            make.width.height.equalTo(32)
-            avatarLeading = make.left.equalToSuperview().offset(12).constraint
-            avatarTrailing = make.right.equalToSuperview().offset(-12).constraint
+            make.width.height.equalTo(22)
         }
-        avatarTrailing?.deactivate()
 
         avatarLabel.snp.makeConstraints { make in
             make.center.equalToSuperview()
         }
 
-        bubbleView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(4)
-            make.bottom.equalToSuperview().offset(-4)
-            make.width.lessThanOrEqualToSuperview().multipliedBy(0.78)
-            bubbleLeading = make.left.equalTo(avatarView.snp.right).offset(8).constraint
-            bubbleTrailing = make.right.equalTo(avatarView.snp.left).offset(-8).constraint
-        }
-        bubbleTrailing?.deactivate()
-
         messageLabel.snp.makeConstraints { make in
-            make.edges.equalToSuperview().inset(UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12))
+            make.top.equalTo(speakerRowView.snp.bottom).offset(4)
+            make.left.right.equalToSuperview().inset(4)
+        }
+
+        latencyContainerView.snp.makeConstraints { make in
+            latencyTop = make.top.equalTo(messageLabel.snp.bottom).offset(0).constraint
+            make.left.right.equalToSuperview().inset(4)
+            make.bottom.equalToSuperview().offset(-6)
+            latencyHeight = make.height.equalTo(0).constraint
+        }
+
+        latencyTurnLabel.snp.makeConstraints { make in
+            make.left.centerY.equalToSuperview()
+            make.height.equalTo(16)
+            make.width.greaterThanOrEqualTo(22)
+        }
+
+        latencySummaryLabel.snp.makeConstraints { make in
+            make.left.equalTo(latencyTurnLabel.snp.right).offset(6)
+            make.right.centerY.equalToSuperview()
         }
     }
 
-    func configure(with transcript: Transcript) {
+    func configure(
+        with transcript: Transcript,
+        latencyMetrics: TurnLatencyMetrics?,
+        isLatencyMetricsVisible: Bool
+    ) {
         let isAgent = transcript.type == .agent
 
         avatarView.backgroundColor = isAgent ? AppColors.avatarAgent : AppColors.avatarUser
         avatarLabel.text = isAgent ? "AI" : "Me"
-
-        bubbleView.backgroundColor = isAgent ? AppColors.bubbleAgentBg : AppColors.bubbleUserBg
+        speakerNameLabel.text = isAgent ? "Assistant" : "Me"
+        speakerNameLabel.textAlignment = isAgent ? .left : .right
+        messageLabel.textAlignment = isAgent ? .left : .right
         messageLabel.textColor = isAgent ? AppColors.bubbleAgentText : AppColors.bubbleUserText
         messageLabel.text = transcript.text.isEmpty ? "..." : transcript.text
 
-        if isAgent {
-            avatarLeading?.activate()
-            avatarTrailing?.deactivate()
-            bubbleLeading?.activate()
-            bubbleTrailing?.deactivate()
-            bubbleView.semanticContentAttribute = .forceLeftToRight
-        } else {
-            avatarLeading?.deactivate()
-            avatarTrailing?.activate()
-            bubbleLeading?.deactivate()
-            bubbleTrailing?.activate()
-            bubbleView.semanticContentAttribute = .forceRightToLeft
-        }
-
-        let smallCorner: CGFloat = 2
-        let bigCorner: CGFloat = 16
-        if isAgent {
-            applyBubbleCorners(topLeft: smallCorner, topRight: bigCorner, bottomLeft: bigCorner, bottomRight: bigCorner)
-        } else {
-            applyBubbleCorners(topLeft: bigCorner, topRight: smallCorner, bottomLeft: bigCorner, bottomRight: bigCorner)
-        }
+        speakerRowView.semanticContentAttribute = isAgent ? .forceLeftToRight : .forceRightToLeft
+        configureLatencyMetrics(latencyMetrics, isVisible: isAgent && isLatencyMetricsVisible)
     }
 
-    private func applyBubbleCorners(topLeft: CGFloat, topRight: CGFloat, bottomLeft: CGFloat, bottomRight: CGFloat) {
-        let path = UIBezierPath()
-        bubbleView.layoutIfNeeded()
-        let bounds = bubbleView.bounds.isEmpty ? CGRect(x: 0, y: 0, width: 200, height: 40) : bubbleView.bounds
+    private func configureLatencyMetrics(_ metrics: TurnLatencyMetrics?, isVisible: Bool) {
+        let shouldShow = isVisible && metrics != nil
+        latencyContainerView.isHidden = !shouldShow
+        latencyTop?.update(offset: shouldShow ? 5 : 0)
+        latencyHeight?.update(offset: shouldShow ? 34 : 0)
 
-        path.move(to: CGPoint(x: topLeft, y: 0))
-        path.addLine(to: CGPoint(x: bounds.width - topRight, y: 0))
-        path.addArc(withCenter: CGPoint(x: bounds.width - topRight, y: topRight), radius: topRight, startAngle: -.pi / 2, endAngle: 0, clockwise: true)
-        path.addLine(to: CGPoint(x: bounds.width, y: bounds.height - bottomRight))
-        path.addArc(withCenter: CGPoint(x: bounds.width - bottomRight, y: bounds.height - bottomRight), radius: bottomRight, startAngle: 0, endAngle: .pi / 2, clockwise: true)
-        path.addLine(to: CGPoint(x: bottomLeft, y: bounds.height))
-        path.addArc(withCenter: CGPoint(x: bottomLeft, y: bounds.height - bottomLeft), radius: bottomLeft, startAngle: .pi / 2, endAngle: .pi, clockwise: true)
-        path.addLine(to: CGPoint(x: 0, y: topLeft))
-        path.addArc(withCenter: CGPoint(x: topLeft, y: topLeft), radius: topLeft, startAngle: .pi, endAngle: -.pi / 2, clockwise: true)
-        path.close()
+        guard let metrics else {
+            latencyTurnLabel.text = nil
+            latencySummaryLabel.text = nil
+            return
+        }
 
-        let mask = CAShapeLayer()
-        mask.path = path.cgPath
-        bubbleView.layer.mask = mask
+        latencyTurnLabel.text = "#\(metrics.turnId)"
+        latencySummaryLabel.text = buildLatencySummary(metrics)
+    }
+
+    private func buildLatencySummary(_ metrics: TurnLatencyMetrics) -> String {
+        [
+            "E2E:\(metrics.e2eLatencyMs.latencyText)",
+            "RTC:\(metrics.transportLatencyMs.latencyText)",
+            "AI:\(metrics.algorithmProcessingLatencyMs.latencyText)",
+            "ASR:\(metrics.asrLatencyMs.latencyText)",
+            "LLM:\(metrics.llmLatencyMs.latencyText)",
+            "TTS:\(metrics.ttsLatencyMs.latencyText)"
+        ].joined(separator: "  ")
     }
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        avatarLeading?.deactivate()
-        avatarTrailing?.deactivate()
-        bubbleLeading?.deactivate()
-        bubbleTrailing?.deactivate()
-        avatarLeading?.activate()
-        bubbleLeading?.activate()
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        if let text = avatarLabel.text {
-            let isAgent = text == "AI"
-            let smallCorner: CGFloat = 2
-            let bigCorner: CGFloat = 16
-            if isAgent {
-                applyBubbleCorners(topLeft: smallCorner, topRight: bigCorner, bottomLeft: bigCorner, bottomRight: bigCorner)
-            } else {
-                applyBubbleCorners(topLeft: bigCorner, topRight: smallCorner, bottomLeft: bigCorner, bottomRight: bigCorner)
-            }
-        }
+        speakerRowView.semanticContentAttribute = .unspecified
+        messageLabel.textAlignment = .left
+        speakerNameLabel.textAlignment = .left
+        configureLatencyMetrics(nil, isVisible: false)
     }
 }
