@@ -1,6 +1,6 @@
 # Publishing
 
-This document is for maintainers who need to package the iOS library for CocoaPods and Swift Package Manager publishing.
+This document is for maintainers who need to prepare Rehoboam upload packages for the iOS CocoaPods and Swift Package Manager releases.
 
 ## Artifact Names
 
@@ -10,21 +10,14 @@ SwiftPM package identity: agent-client-toolkit-swift
 SwiftPM product: AgoraAgentClientToolkit
 ```
 
-The release version comes from `AgoraAgentClientToolkit/AgoraAgentClientToolkit.podspec`:
-
-```ruby
-s.version = '2.9.0'
-```
-
-You can override the version for a local packaging run with:
+For Rehoboam packaging, pass the version explicitly:
 
 ```bash
-VERSION=<version> scripts/build_internal_cocoapods_zip.sh
-VERSION=<version> scripts/build_internal_spm_source_zip.sh
+VERSION=<version> scripts/build_rehoboam_cocoapods_input_zip.sh
 VERSION=<version> scripts/build_rehoboam_swiftpm_input_zip.sh
 ```
 
-## Package the CocoaPods Release Zip
+## Package the Rehoboam CocoaPods Input Zip
 
 Install demo workspace dependencies first:
 
@@ -35,7 +28,7 @@ pod install
 Run:
 
 ```bash
-VERSION=2.9.0 scripts/build_internal_cocoapods_zip.sh
+VERSION=2.9.0-rc.1 scripts/build_rehoboam_cocoapods_input_zip.sh
 ```
 
 The generated zip is written under:
@@ -52,51 +45,26 @@ sdk/
 `-- AgoraAgentClientToolkit.xcframework/
 ```
 
-## Package the SwiftPM Source Zip
+Upload this zip to Rehoboam as the CocoaPods release input. For the Rehoboam
+flow, leave `FILE_URL` unset unless the platform request explicitly asks for a
+prefilled binary URL; the staged podspec otherwise keeps the
+`REPLACE_WITH_BINARY_ZIP_URL` placeholder for the platform-side rewrite.
 
-Run:
+## Package the Rehoboam SwiftPM Input Zip
 
-```bash
-VERSION=2.9.0 scripts/build_internal_spm_source_zip.sh
-```
-
-The generated zip is written under:
-
-```text
-build/internal-spm/AgoraAgentClientToolkit-<version>-<timestamp>/AgoraAgentClientToolkit-<version>-spm-source.zip
-```
-
-The zip contains:
-
-```text
-AgoraAgentClientToolkit-<version>/
-|-- Package.swift
-|-- Package.resolved
-`-- AgoraAgentClientToolkit/
-    |-- README.md
-    `-- AgoraAgentClientToolkit/
-        `-- Classes/
-```
-
-`Package.resolved` is included only when it exists in the repository.
-
-## Package the SwiftPM Rehoboam Input Zip
-
-Use this package when uploading a SwiftPM release input file to Rehoboam. The
-maintainer-facing command is:
+SwiftPM is also published through Rehoboam. The maintainer-facing command is:
 
 ```bash
 VERSION=2.9.0-rc.1 scripts/build_rehoboam_swiftpm_input_zip.sh
 ```
 
-The script prints the generated upload file:
+The script prints the generated Rehoboam upload file:
 
 ```text
 build/internal-spm/AgoraAgentClientToolkit-<version>-rehoboam-<timestamp>/AgoraAgentClientToolkit-<version>-rehoboam-input.zip
 ```
 
-Upload that zip to the internal CDN, then paste the uploaded URL into the
-Rehoboam SwiftPM `File URL` field.
+Upload that zip to Rehoboam for the SwiftPM release.
 
 Internally, the uploaded zip contains `swiftpm_template/`. Rehoboam uses
 `swiftpm_template/sdk/AgoraAgentClientToolkit/Package.swift` as the input
@@ -157,7 +125,8 @@ AgoraRTM_iOS == 2.2.8
 ```
 
 Rehoboam validates the uploaded package and the generated SwiftPM package. Its
-release checks must include:
+platform-side release checks must include the following checks; run them locally
+only when debugging generated Rehoboam output:
 
 ```bash
 unzip -l dist/AgoraAgentClientToolkit.zip | head
@@ -172,30 +141,17 @@ The zip listing must include:
 AgoraAgentClientToolkit.xcframework/Info.plist
 ```
 
-## Validate SwiftPM
-
-Run:
-
-```bash
-scripts/verify_spm.sh
-```
-
-`verify_spm.sh` validates the source manifest, resolves package dependencies,
-and builds the `AgoraAgentClientToolkit` scheme for iOS Simulator.
-
 ## Pre-Publish Checklist
 
-1. The release version is a non-SNAPSHOT release version.
-2. `Package.swift` uses package identity `agent-client-toolkit-swift`.
-3. The SwiftPM product is `AgoraAgentClientToolkit`.
-4. The CocoaPods pod name and Swift module name are `AgoraAgentClientToolkit`.
-5. CocoaPods dependencies are `AgoraRtcEngine_iOS >= 4.5.1` and `AgoraRtm/RtmKit >= 2.2.3`.
-6. SwiftPM source dependencies are `AgoraRtcEngine_iOS >= 4.5.1` and `AgoraRTM_iOS >= 2.2.8`.
-7. The CocoaPods zip includes `AgoraAgentClientToolkit.podspec` and `AgoraAgentClientToolkit.xcframework`.
-8. The SwiftPM source zip includes `Package.swift` and component source files.
-9. `swiftpm_template/sdk/AgoraAgentClientToolkit/Package.swift` uses `.binaryTarget(name:url:checksum:)` placeholders, not `path:`.
-10. The SwiftPM binary artifact zip contains root `AgoraAgentClientToolkit.xcframework/Info.plist`.
-11. The rewritten SwiftPM binary `Package.swift` contains the artifact URL and SHA-256 checksum, not placeholders and not `path:`.
-12. `swift package resolve` passes from the rewritten SwiftPM binary package directory.
-13. SwiftPM binary dependencies are pinned to `AgoraRtcEngine_iOS == 4.5.1` and `AgoraRTM_iOS == 2.2.8`.
-14. Public README files contain only developer-facing installation and usage instructions.
+1. The release version is a non-SNAPSHOT version, for example `2.9.0-rc.1` or `2.9.0`.
+2. The same version is used for both CocoaPods and SwiftPM Rehoboam input packages when they are released together.
+3. The staged CocoaPods podspec inside the generated zip has the expected `s.version`.
+4. The CocoaPods zip includes `AgoraAgentClientToolkit.podspec` and `AgoraAgentClientToolkit.xcframework`.
+5. The CocoaPods pod name and Swift module name are `AgoraAgentClientToolkit`.
+6. CocoaPods dependencies are `AgoraRtcEngine_iOS >= 4.5.1` and `AgoraRtm/RtmKit >= 2.2.3`.
+7. `swiftpm_template/sdk/AgoraAgentClientToolkit/Package.swift` uses `.binaryTarget(name:url:checksum:)` placeholders, not `path:`.
+8. The SwiftPM binary artifact zip generated by Rehoboam contains root `AgoraAgentClientToolkit.xcframework/Info.plist`.
+9. The rewritten SwiftPM binary `Package.swift` contains the artifact URL and SHA-256 checksum, not placeholders and not `path:`.
+10. Rehoboam `swift package resolve` passes from the rewritten SwiftPM binary package directory.
+11. SwiftPM binary dependencies are pinned to `AgoraRtcEngine_iOS == 4.5.1` and `AgoraRTM_iOS == 2.2.8`.
+12. Public README files contain only developer-facing installation and usage instructions.

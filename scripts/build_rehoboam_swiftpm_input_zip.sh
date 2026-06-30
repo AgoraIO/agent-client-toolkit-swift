@@ -3,7 +3,6 @@ set -euo pipefail
 
 COMPONENT_NAME="AgoraAgentClientToolkit"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PODSPEC_PATH="$ROOT_DIR/AgoraAgentClientToolkit/AgoraAgentClientToolkit.podspec"
 WORKSPACE="${WORKSPACE:-$ROOT_DIR/VoiceAgent.xcworkspace}"
 SCHEME="${SCHEME:-$COMPONENT_NAME}"
 CONFIGURATION="${CONFIGURATION:-Release}"
@@ -13,10 +12,12 @@ RUN_ID="$(date +%Y%m%d%H%M%S)"
 
 VERSION="${VERSION:-}"
 if [[ -z "$VERSION" ]]; then
-  VERSION="$(/usr/bin/ruby -e "spec = File.read(ARGV[0]); puts spec[/s\\.version\\s*=\\s*['\\\"]([^'\\\"]+)/, 1]" "$PODSPEC_PATH")"
-fi
-if [[ -z "$VERSION" ]]; then
   echo "Unable to resolve version. Pass VERSION=2.9.0-rc.1." >&2
+  exit 1
+fi
+
+if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
+  echo "Rehoboam SwiftPM input zip requires a non-SNAPSHOT version: $VERSION" >&2
   exit 1
 fi
 

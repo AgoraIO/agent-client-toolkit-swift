@@ -11,24 +11,25 @@ XCODE_WORK_ROOT="${XCODE_WORK_ROOT:-/private/tmp/$COMPONENT_NAME-internal-cocoap
 PACKAGE_WORK_ROOT="${PACKAGE_WORK_ROOT:-/private/tmp/$COMPONENT_NAME-cocoapods-package}"
 CLEAN_DERIVED_DATA="${CLEAN_DERIVED_DATA:-1}"
 KEEP_STAGING="${KEEP_STAGING:-0}"
+VERSION="${VERSION:-}"
+
+if [[ -z "$VERSION" ]]; then
+  echo "Unable to resolve version. Pass VERSION=2.9.0-rc.1." >&2
+  exit 1
+fi
+
+if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
+  echo "Rehoboam CocoaPods input zip requires a non-SNAPSHOT version: $VERSION" >&2
+  exit 1
+fi
 
 if [[ ! -d "$ROOT_DIR/Pods/Pods.xcodeproj" ]]; then
-  echo "Pods project is missing. Run 'pod install' before building the internal CocoaPods zip." >&2
+  echo "Pods project is missing. Run 'pod install' before building the Rehoboam CocoaPods input zip." >&2
   exit 1
 fi
 
 if [[ ! -f "$PODSPEC_TEMPLATE" ]]; then
   echo "Missing binary podspec template: $PODSPEC_TEMPLATE" >&2
-  exit 1
-fi
-
-VERSION="${VERSION:-}"
-if [[ -z "$VERSION" ]]; then
-  VERSION="$(/usr/bin/ruby -e "spec = File.read(ARGV[0]); puts spec[/s\\.version\\s*=\\s*['\\\"]([^'\\\"]+)/, 1]" "$PODSPEC_TEMPLATE")"
-fi
-
-if [[ -z "$VERSION" ]]; then
-  echo "Unable to resolve $COMPONENT_NAME version from $PODSPEC_TEMPLATE." >&2
   exit 1
 fi
 
@@ -90,6 +91,8 @@ xcodebuild -create-xcframework \
   -output "$XCFRAMEWORK_PATH"
 
 cp "$PODSPEC_TEMPLATE" "$STAGED_PODSPEC"
+VERSION="$VERSION" /usr/bin/ruby -0pi -e 'gsub(/s\.version\s*=\s*['"'"'"][^'"'"'"]+['"'"'"]/, "s.version = " + ENV.fetch("VERSION").dump)' "$STAGED_PODSPEC"
+VERSION="$VERSION" /usr/bin/ruby -e "spec = File.read(ARGV[0]); expected = ENV.fetch('VERSION'); actual = spec[/s\\.version\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]/, 1]; abort(\"Staged podspec version mismatch: expected #{expected}, got #{actual || 'nil'}\") unless actual == expected" "$STAGED_PODSPEC"
 
 if [[ -n "${FILE_URL:-}" ]]; then
   FILE_URL="$FILE_URL" /usr/bin/ruby -0pi -e "gsub('REPLACE_WITH_BINARY_ZIP_URL', ENV.fetch('FILE_URL'))" "$STAGED_PODSPEC"
@@ -97,12 +100,12 @@ else
   echo "FILE_URL is not set; staged podspec keeps REPLACE_WITH_BINARY_ZIP_URL." >&2
 fi
 
-echo "Creating internal CocoaPods zip..."
+echo "Creating Rehoboam CocoaPods input zip..."
 (
   cd "$STAGING_ROOT"
   /usr/bin/zip -qry "$ZIP_PATH" "$COMPONENT_NAME.podspec" sdk
 )
 
-echo "Internal CocoaPods zip: $ZIP_PATH"
+echo "Rehoboam CocoaPods input zip: $ZIP_PATH"
 echo "Zip contents:"
 /usr/bin/unzip -l "$ZIP_PATH"

@@ -298,6 +298,35 @@ To modify request parameters: edit the `parameter` dictionary in `startAgent()`.
 6. **AgoraAgentClientToolkit is read-only for the sample app**: The app must use it through the `AgoraAgentClientToolkit` Pod dependency. Do not copy the component source into `VoiceAgent/` or modify it from the sample app.
 7. **Server Overrides**: If you point the app to a local backend, use the host machine IP, not `localhost` or `127.0.0.1`, when testing on a real device.
 
+## Internal Rehoboam Release
+
+Rehoboam is the internal release platform for both CocoaPods and SwiftPM. Do not document Rehoboam, Jenkins download URLs, or internal release requests in public-facing README files.
+
+Release strategy:
+
+- Do not use the final release version as the first validation artifact.
+- Package and publish an RC first, for example `2.9.0-rc.1`.
+- Validate the RC through Rehoboam platform validation plus sample or clean-app consumption.
+- If fixes are needed before formal publish, drop the staging deployment and publish the next RC.
+- Publish the final version, for example `2.9.0`, only after the RC passes.
+- If a problem is found after the final version is published, do not overwrite or delete that version; publish a new version such as `2.9.1`.
+
+To prepare the Rehoboam upload zips:
+
+```bash
+VERSION=2.9.0-rc.1 scripts/build_rehoboam_cocoapods_input_zip.sh
+VERSION=2.9.0-rc.1 scripts/build_rehoboam_swiftpm_input_zip.sh
+```
+
+The generated zips are:
+
+```text
+build/internal-cocoapods/AgoraAgentClientToolkit-<version>-<timestamp>/AgoraAgentClientToolkit-<version>.zip
+build/internal-spm/AgoraAgentClientToolkit-<version>-rehoboam-<timestamp>/AgoraAgentClientToolkit-<version>-rehoboam-input.zip
+```
+
+Use the same explicit `VERSION` for CocoaPods and SwiftPM when they are released together. The scripts require a non-SNAPSHOT version.
+
 ## File Naming
 
 - Swift source files: `PascalCase.swift`
