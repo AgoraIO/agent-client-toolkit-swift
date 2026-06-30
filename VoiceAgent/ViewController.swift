@@ -648,7 +648,7 @@ class ViewController: UIViewController {
 
     @MainActor
     private func ensureMicrophonePermission() async -> Bool {
-        switch AVAudioApplication.shared.recordPermission {
+        switch AVAudioSession.sharedInstance().recordPermission {
         case .granted:
             return true
         case .denied:
@@ -656,7 +656,7 @@ class ViewController: UIViewController {
             return false
         case .undetermined:
             return await withCheckedContinuation { continuation in
-                AVAudioApplication.requestRecordPermission { granted in
+                AVAudioSession.sharedInstance().requestRecordPermission { granted in
                     DispatchQueue.main.async {
                         if !granted {
                             self.showErrorToast("Microphone permission is required for voice conversation.")

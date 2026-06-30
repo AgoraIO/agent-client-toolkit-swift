@@ -35,7 +35,7 @@ Current quickstart scope is limited to voice session startup, startup-time SOS /
 | State Management | `ViewController` instance state |
 | Networking | `URLSession` |
 | RTC SDK | Agora RTC SDK (`AgoraRtcEngine_iOS` 4.5.1) |
-| RTM SDK | Agora RTM SDK (`AgoraRtm/RtmKit` 2.2.3+) |
+| RTM SDK | Agora RTM SDK (`AgoraRtm/RtmKit` 2.2.3) |
 | AgoraAgentClientToolkit | Local Pod component, do not modify from the sample app |
 
 For runtime structure, see `ARCHITECTURE.md`. For entry files, see `README.md`.

@@ -19,8 +19,8 @@ let package = Package(
     dependencies: [
         // Transitive Agora SDK dependencies required by AgoraAgentClientToolkit.
         // Consumer apps do not need to add them again unless they call RTC/RTM APIs directly.
-        .package(url: "https://github.com/AgoraIO/AgoraRtcEngine_iOS.git", from: "4.5.1"),
-        .package(url: "https://github.com/AgoraIO/AgoraRTM_iOS.git", from: "2.2.8")
+        .package(url: "https://github.com/AgoraIO/AgoraRtcEngine_iOS.git", .exact("4.5.1")),
+        .package(url: "https://github.com/AgoraIO/AgoraRTM_iOS.git", .exact("2.2.8"))
     ],
     targets: [
         .target(

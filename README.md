@@ -48,19 +48,19 @@ targets: [
 
 - iOS 15.0 or later
 - Xcode 14.0 or later
-- Agora RTC SDK `4.5.1` or later
+- Agora RTC SDK `4.5.1`
 - Agora RTM SDK
 - Real-time Messaging (RTM) enabled in the Agora Console
 
 SwiftPM dependencies:
 
-- `AgoraRtcEngine_iOS` `4.5.1` or later
-- `AgoraRTM_iOS` `2.2.8` or later
+- `AgoraRtcEngine_iOS` `4.5.1`
+- `AgoraRTM_iOS` `2.2.8`
 
 CocoaPods dependencies:
 
-- `AgoraRtcEngine_iOS` `4.5.1` or later
-- `AgoraRtm/RtmKit` `2.2.3` or later
+- `AgoraRtcEngine_iOS` `4.5.1`
+- `AgoraRtm/RtmKit` `2.2.3`
 
 `AgoraAgentClientToolkit` declares Agora RTC and RTM as package dependencies. Your app only needs to declare RTC/RTM directly if your own code also imports and calls RTC/RTM APIs.
 

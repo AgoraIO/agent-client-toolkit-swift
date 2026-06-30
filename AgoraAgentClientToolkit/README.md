@@ -13,9 +13,9 @@ See the root [README.md](../README.md) for CocoaPods and Swift Package Manager s
 | Requirement | Version |
 |-------------|---------|
 | iOS deployment target | 15.0+ |
-| Agora RTC SDK | `AgoraRtcEngine_iOS` 4.5.1+ |
-| Agora RTM SDK for CocoaPods | `AgoraRtm/RtmKit` 2.2.3+ |
-| Agora RTM SDK for SwiftPM | `AgoraRTM_iOS` 2.2.8+ |
+| Agora RTC SDK | `AgoraRtcEngine_iOS` 4.5.1 |
+| Agora RTM SDK for CocoaPods | `AgoraRtm/RtmKit` 2.2.3 |
+| Agora RTM SDK for SwiftPM | `AgoraRTM_iOS` 2.2.8 |
 | Swift | 5.0+ |
 
 The host app owns:
