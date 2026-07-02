@@ -194,6 +194,10 @@ The server processing results are delivered through `onUserManualSosEvent` and
 generated `requestId`; the host app still owns the agent start request and the
 choice of SOS / EOS detection mode.
 
+## Release Notes
+
+For release notes, see [CHANGELOG.md](./CHANGELOG.md).
+
 ## Maintainers
 
 For CocoaPods / SwiftPM packaging, see [docs/publishing.md](./docs/publishing.md).

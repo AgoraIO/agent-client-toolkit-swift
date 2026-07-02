@@ -641,6 +641,7 @@ class ViewController: UIViewController {
         rtcEngine?.leaveChannel()
         convoAIAPI?.unsubscribeMessage(channelName: channel) { _ in }
         rtmEngine?.logout { _, _ in }
+        agentId = ""
         token = ""
         agentToken = ""
         authToken = ""
@@ -997,12 +998,16 @@ class ViewController: UIViewController {
         let settingsViewController = TurnDetectionSettingsViewController(
             sosMode: sosDetectionMode,
             eosMode: eosDetectionMode,
+            agentId: agentId,
             canChangeTurnDetectionMode: canChangeTurnDetectionMode,
             onSosModeChanged: { [weak self] mode in
                 self?.setSosDetectionMode(mode)
             },
             onEosModeChanged: { [weak self] mode in
                 self?.setEosDetectionMode(mode)
+            },
+            onCopyAgentId: { [weak self] in
+                self?.copyAgentId() ?? false
             }
         )
         present(settingsViewController, animated: true)
@@ -1098,6 +1103,18 @@ class ViewController: UIViewController {
         isLatencyMetricsVisible = sender.isOn
         chatSessionView.setRealtimeDataVisible(isLatencyMetricsVisible)
         chatSessionView.tableView.reloadData()
+    }
+
+    private func copyAgentId() -> Bool {
+        let currentAgentId = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !currentAgentId.isEmpty else {
+            addDebugMessage("Copy agent ID failed error=Agent ID is not available")
+            return false
+        }
+
+        UIPasteboard.general.string = currentAgentId
+        addDebugMessage("Agent ID copied successfully")
+        return true
     }
 
     private func sendTextMessage(_ text: String) -> Bool {
@@ -1241,14 +1258,18 @@ class ViewController: UIViewController {
     }
     
     private func showErrorToast(_ message: String) {
+        showToast(message, backgroundColor: AppColors.errorRedDark.withAlphaComponent(0.9), textColor: .white)
+    }
+
+    private func showToast(_ message: String, backgroundColor: UIColor, textColor: UIColor) {
         let toast = UIView()
-        toast.backgroundColor = AppColors.errorRedDark.withAlphaComponent(0.9)
+        toast.backgroundColor = backgroundColor
         toast.layer.cornerRadius = 12
         view.addSubview(toast)
         
         let label = UILabel()
         label.text = message
-        label.textColor = .white
+        label.textColor = textColor
         label.numberOfLines = 0
         label.textAlignment = .center
         label.font = .systemFont(ofSize: 14)
