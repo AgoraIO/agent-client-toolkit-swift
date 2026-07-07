@@ -10,7 +10,6 @@ import Foundation
 class KeyCenter {
     static let APP_ID: String = value(for: "APP_ID")
     static let APP_CERTIFICATE: String = value(for: "APP_CERTIFICATE")
-    static let TOOLBOX_SERVER_HOST: String = value(for: "TOOLBOX_SERVER_HOST")
     static let ASR_VENDOR: String = value(for: "ASR_VENDOR", defaultValue: "soniox")
     static let ASR_API_KEY: String = value(for: "ASR_API_KEY")
     static let ASR_MODEL: String = value(for: "ASR_MODEL", defaultValue: "stt-rt-preview-v2")
@@ -25,7 +24,8 @@ class KeyCenter {
 
     static var missingRequiredKeys: [String] {
         [
-            ("APP_ID", APP_ID)
+            ("APP_ID", APP_ID),
+            ("APP_CERTIFICATE", APP_CERTIFICATE)
         ].compactMap { key, value in
             value.isEmpty ? key : nil
         }

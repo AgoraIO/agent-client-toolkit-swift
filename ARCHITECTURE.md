@@ -10,14 +10,16 @@ Current scope:
 - RTC join + RTM login
 - Startup-time selection for independent SOS / EOS turn detection
 - Real-time transcript rendering
+- Real-time latency display with a visibility toggle
 - Agent status rendering
+- Interrupt
+- Text message and image URL publishing
 - Manual SOS / EOS trigger buttons shown by selected detection modes
 - Mute / unmute
 - Stop Agent and cleanup
 
 Out of scope for this quickstart:
 
-- Text or image message sending UI
 - Multi-screen business flow
 - Backend-owned token / agent startup flow
 
@@ -28,10 +30,11 @@ The page is intentionally single-screen and is organized into these regions:
 - debug log panel at the top
 - startup-time turn detection summary and settings button
 - start view before connection
-- transcript list after connection
+- transcript list and latency toggle after connection
 - capability panel for manual SOS / EOS actions when enabled
 - agent status view
-- mute / stop controls
+- mute / chat / stop controls
+- bottom input panel for connected-only text and image URL messages
 
 ## Project Structure
 
@@ -54,6 +57,10 @@ ios-swift/
 │   ├── Tools/
 │   │   ├── AgentManager.swift
 │   │   └── NetworkManager.swift
+│   ├── Dynamickey/
+│   │   ├── TokenGenerator.swift
+│   │   ├── RtcTokenBuilder2.swift
+│   │   └── AccessToken2.swift
 └── VoiceAgent.xcworkspace
 
 AgoraAgentClientToolkit is consumed through the local Pod dependency declared in
@@ -65,7 +72,7 @@ AgoraAgentClientToolkit is consumed through the local Pod dependency declared in
 ```text
 ViewController /
 RTC / RTM / ConversationalAIAPI /
-NetworkManager / AgentManager
+TokenGenerator / NetworkManager / AgentManager
 ```
 
 `ConversationalAIAPI` types are provided by the `AgoraAgentClientToolkit` Pod,
@@ -93,13 +100,13 @@ iOS Swift-specific conventions:
 - `channel` format is `channel_swift_<6-digit-random>`
 - REST auth header is `Authorization: agora token=<authToken>`
 
-## Transcript Data Flow
+## Transcript And Message Data Flow
 
 ```text
 RTM message
   → AgoraAgentClientToolkit
   → ViewController.onTranscriptUpdated(...)
-  → transcripts update
+  → transcriptItems update
   → ChatSessionView table reload
 ```
 
@@ -107,16 +114,30 @@ The current UI renders:
 
 - agent transcript on the left
 - user transcript on the right
+- optional turn latency metrics on agent transcript rows
+
+Chat message publishing:
+
+```text
+Tap Chat
+  → ChatMessageInputPanelView
+  → ViewController.sendTextMessage(...) / sendImageUrlMessage(...)
+  → ConversationalAIAPI.chat(...)
+  → onMessageReceiptUpdated(...) / onMessageError(...)
+  → debug log update
+```
 
 ## UI State Rendering
 
 ```text
-isLoading / isError  → loading toast / error toast
-currentAgentState    → AgentStateView status
-transcripts          → transcript table content
-debug log text       → top log panel
-isMicMuted           → mic button state
-sos/eos detection   → turn detection label + manual capability panel
+startupState             → start button, loading toast, connected controls
+currentAgentState        → AgentStateView status
+transcriptItems          → transcript table content
+pending latency metrics  → real-time data labels on agent rows
+debugLogList             → top log panel
+isMicMuted               → mic button state
+sos/eos detection        → turn detection label + manual capability panel
+chat input visibility    → bottom text / image URL input panel
 ```
 
 Turn detection is selected before startup. `SOS` controls
@@ -138,7 +159,9 @@ Tap SOS / EOS
 
 ## Token Flow
 
-The quickstart generates two token roles through the demo token service:
+The quickstart generates three token roles through `TokenGenerator`. In demo
+mode, `TokenGenerator` uses local AccessToken2 generation from
+`APP_CERTIFICATE`:
 
 | Token | Purpose | Usage |
 |-------|---------|-------|
@@ -148,9 +171,10 @@ The quickstart generates two token roles through the demo token service:
 
 Notes:
 
-- `token` is generated with the current `channel`
+- all three tokens are unified RTC + RTM tokens
+- `token` uses the current `channel` so RTC join and RTM login are bound to the session channel
 - `agentToken` and `authToken` are generated after RTC / RTM are both ready
-- production should replace the demo token service with a backend
+- production should replace demo-side token generation with a backend and must not embed `APP_CERTIFICATE`
 
 ## Agent Lifecycle
 
@@ -171,23 +195,21 @@ Additional behavior:
 
 ```text
 KeyCenter.swift
-  → ViewController / AgentManager / NetworkManager
+  → ViewController / AgentManager / NetworkManager / TokenGenerator
 ```
 
 Required fields:
 
 - `APP_ID`
+- `APP_CERTIFICATE`
 
 Local credentials should be stored in `VoiceAgent/Secrets.plist`, copied from
 `VoiceAgent/Secrets.example.plist`. The local secrets file is ignored by Git.
 CI or internal builds can inject the same values through Xcode build settings
-named `APP_ID`, optional `APP_CERTIFICATE`, and `TOOLBOX_SERVER_HOST`.
-`APP_CERTIFICATE` is sent to the demo token service only when configured.
+named `APP_ID` and `APP_CERTIFICATE`.
 
 Default demo ASR / LLM / TTS values are resolved by `KeyCenter.swift`:
 
-- Token service: `TOOLBOX_SERVER_HOST`
-- Token certificate: `APP_CERTIFICATE`
 - ASR: `ASR_VENDOR`, `ASR_API_KEY`, `ASR_MODEL`
 - LLM: `LLM_URL`, `LLM_API_KEY`, `LLM_MODEL`
 - TTS: `TTS_VENDOR`, `TTS_KEY`, `TTS_MODEL_ID`, `TTS_VOICE_ID`, `TTS_SAMPLE_RATE`
@@ -195,6 +217,6 @@ Default demo ASR / LLM / TTS values are resolved by `KeyCenter.swift`:
 ## Constraints
 
 - This is a demo; token generation and agent startup are client-side for convenience
-- Production should move token generation and REST startup to a backend
+- Production should move token generation and REST startup to a backend and must not embed `APP_CERTIFICATE`
 - `AgoraAgentClientToolkit` should be consumed through Pod dependency and not
   copied into `VoiceAgent/`

@@ -674,47 +674,58 @@ class ViewController: UIViewController {
     
     // MARK: - Token Generation
     private func generateUserToken() async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            NetworkManager.shared.generateToken(channelName: channel, uid: "\(uid)", types: [.rtc, .rtm]) { token in
-                guard let token = token else {
-                    self.addDebugMessage("Generate user token failed")
-                    continuation.resume(throwing: NSError(domain: "generateUserToken", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get user token. Please try again."]))
-                    return
-                }
-                self.token = token
-                self.addDebugMessage("Generate user token successfully")
-                continuation.resume()
-            }
-        }
+        token = try await generateToken(
+            uid: "\(uid)",
+            failureLog: "Generate user token failed",
+            errorDomain: "generateUserToken",
+            errorMessage: "Failed to get user token. Please try again."
+        )
+        addDebugMessage("Generate user token successfully")
     }
     
     private func generateAgentToken() async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            NetworkManager.shared.generateToken(channelName: channel, uid: "\(agentUid)", types: [.rtc, .rtm]) { token in
-                guard let token = token else {
-                    self.addDebugMessage("Generate agent token failed")
-                    continuation.resume(throwing: NSError(domain: "generateAgentToken", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get agent token. Please try again."]))
-                    return
-                }
-                self.agentToken = token
-                self.addDebugMessage("Generate agent token successfully")
-                continuation.resume()
-            }
-        }
+        agentToken = try await generateToken(
+            uid: "\(agentUid)",
+            failureLog: "Generate agent token failed",
+            errorDomain: "generateAgentToken",
+            errorMessage: "Failed to get agent token. Please try again."
+        )
+        addDebugMessage("Generate agent token successfully")
     }
 
     private func generateAuthToken() async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            NetworkManager.shared.generateToken(channelName: channel, uid: "\(agentUid)", types: [.rtc, .rtm]) { token in
-                guard let token = token else {
-                    self.addDebugMessage("Generate auth token failed")
-                    continuation.resume(throwing: NSError(domain: "generateAuthToken", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get auth token. Please try again."]))
-                    return
-                }
-                self.authToken = token
-                self.addDebugMessage("Generate auth token successfully")
-                continuation.resume()
-            }
+        authToken = try await generateToken(
+            uid: "\(agentUid)",
+            failureLog: "Generate auth token failed",
+            errorDomain: "generateAuthToken",
+            errorMessage: "Failed to get auth token. Please try again."
+        )
+        addDebugMessage("Generate auth token successfully")
+    }
+
+    private func generateToken(
+        uid: String,
+        failureLog: String,
+        errorDomain: String,
+        errorMessage: String
+    ) async throws -> String {
+        let tokenResult = await TokenGenerator.generateTokensAsync(
+            channelName: channel,
+            uid: uid
+        )
+
+        switch tokenResult {
+        case .success(let token):
+            return token
+        case .failure(let error):
+            addDebugMessage(failureLog)
+            throw NSError(
+                domain: errorDomain,
+                code: -1,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "\(errorMessage) \(error.localizedDescription)"
+                ]
+            )
         }
     }
     

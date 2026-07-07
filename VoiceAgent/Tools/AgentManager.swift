@@ -8,7 +8,7 @@
 import Foundation
 
 class AgentManager {
-    static private var API_BASE_URL = "https://api-test.agora.io/api/conversational-ai-agent/v2/projects"
+    static private var API_BASE_URL = "https://api.agora.io/api/conversational-ai-agent/v2/projects"
 
     static func startAgent(parameter: [String: Any], token: String, completion: ((String?, Error?) -> ())?) {
         let url = "\(API_BASE_URL)/\(KeyCenter.APP_ID)/join"

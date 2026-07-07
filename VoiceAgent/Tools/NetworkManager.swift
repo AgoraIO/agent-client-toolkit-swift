@@ -1,23 +1,19 @@
 //
 //  NetworkManager.swift
-//  Scene-Examples
+//  VoiceAgent
 //
-//  Created by zhaoyongqiang on 2021/11/19.
+//  Generic HTTP helpers.
 //
-import UIKit
+import Foundation
 
-public enum AgoraTokenType: Int {
-    case rtc = 1
-    case rtm = 2
-    case chat = 3
-}
+// MARK: - NetworkManager
 
-public class NetworkManager:NSObject {
+public class NetworkManager: NSObject {
     enum HTTPMethods: String {
         case GET
         case POST
     }
-    
+
     public typealias SuccessClosure = ([String: Any]) -> Void
     public typealias FailClosure = (String) -> Void
 
@@ -32,55 +28,6 @@ public class NetworkManager:NSObject {
     }
 
     public static let shared = NetworkManager()
-    
-    /// get token
-    /// - Parameters:
-    ///   - channelName: the name of channel
-    ///   - uid: user uid
-    ///   - types: [token type :  token string]
-    public func generateToken(channelName: String,
-                       uid: String,
-                       expire: Int = 86400,
-                       types: [AgoraTokenType],
-                       success: @escaping (String?) -> Void) {
-        var params: [String: Any] = [
-            "appId": KeyCenter.APP_ID,
-            "channelName": channelName,
-            "expire": expire,
-            "src": "iOS",
-            "ts": String(Int(Date().timeIntervalSince1970 * 1000)),
-            "uid": uid
-        ]
-
-        if !KeyCenter.APP_CERTIFICATE.isEmpty {
-            params["appCertificate"] = KeyCenter.APP_CERTIFICATE
-        }
-
-        if types.count == 1, let type = types.first {
-            params["type"] = NSNumber(value: type.rawValue)
-        } else {
-            params["types"] = types.map { NSNumber(value: $0.rawValue) }
-        }
-
-        let host = KeyCenter.TOOLBOX_SERVER_HOST.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let url = "\(host)/v2/token/generate"
-        NetworkManager.shared.postRequest(urlString: url,
-                                          params: params) { response in
-            if let code = response["code"] as? Int, code != 0 {
-                print("[NetworkManager] generateToken failed: code=\(code), message=\(String(describing: response["message"]))")
-                success(nil)
-                return
-            }
-
-            let data = response["data"] as? [String: Any]
-            let token = data?["token"] as? String
-            success(token)
-        } failure: { error in
-            print("[NetworkManager] generateToken failed: \(error)")
-            success(nil)
-        }
-       
-    }
     
     public func getRequest(urlString: String, params: [String: Any]?, headers: [String: String]? = nil, success: SuccessClosure?, failure: FailClosure?) {
         DispatchQueue.global().async {

@@ -22,7 +22,7 @@ Conversational AI Quickstart — iOS real-time voice conversation client built w
 
 The client directly calls Agora RESTful API to start/stop Agent, authenticated via HTTP token (`Authorization: agora token=<token>`). The current implementation aligns with the Kotlin demo payload and sends explicit `properties.asr`, `properties.llm`, and `properties.tts` blocks.
 
-Current quickstart scope is limited to voice session startup, startup-time SOS / EOS turn detection selection, transcript display, state rendering, manual SOS / EOS trigger buttons when enabled, mute, and stop. It does not expose text or image message sending UI.
+Current quickstart scope is limited to voice session startup, startup-time SOS / EOS turn detection selection, transcript and latency display, state rendering, interrupt, text / image URL message sending, manual SOS / EOS trigger buttons when enabled, mute, and stop.
 
 ## Tech Stack
 
@@ -45,13 +45,15 @@ For runtime structure, see `ARCHITECTURE.md`. For entry files, see `README.md`.
 ### ViewController
 
 - Main controller for the whole demo
-- Manages `ConnectionStartView`, `ChatSessionView`, and the always-visible debug log panel
+- Manages `ConnectionStartView`, `ChatSessionView`, `ChatMessageInputPanelView`, and the always-visible debug log panel
 - Holds session state directly as instance properties:
-  - `channel`, `token`, `agentToken`, `agentId`
+  - `channel`, `token`, `agentToken`, `authToken`, `agentId`
   - `uid`, `agentUid`
-  - `transcripts`, `isMicMuted`, `currentAgentState`
-- Auto flow: generate user token → login RTM → join RTC → subscribe ConvoAI → generate agent token → start agent
+  - `transcriptItems`, `pendingTurnLatencyMetrics`, `isLatencyMetricsVisible`
+  - `isMicMuted`, `currentAgentState`, `startupState`
+- Auto flow: generate user token → login RTM → join RTC → subscribe ConvoAI → generate agent token → generate auth token → start agent
 - Turn detection flow: the top-right settings button selects independent SOS / EOS detection modes before startup. Both settings support `VAD`, `Semantic`, and `Manual`.
+- Chat message flow: the chat button opens a connected-only input panel that sends text messages or image URLs through `ConversationalAIAPI.chat(...)` and logs publish, receipt, and error callbacks.
 - Manual turn flow: when SOS or EOS detection is set to `Manual`, the chat view shows the corresponding manual trigger button after connection and logs publish/result callbacks.
 - Random channel name format is `channel_swift_<6-digit-random>`
 
@@ -68,14 +70,17 @@ For runtime structure, see `ARCHITECTURE.md`. For entry files, see `README.md`.
 - `stopAgent()`: POST `/agents/{agentId}/leave`
 - Authentication: `Authorization: agora token=<authToken>`
 
-### NetworkManager (Demo Only)
+### TokenGenerator (Demo Only)
 
-- Generates RTC/RTM tokens via `TOOLBOX_SERVER_HOST` + `/v2/token/generate`
-- Sends `appId`, `channelName`, `uid`, `types` (1=RTC, 2=RTM), `expire`, `src`, and `ts` in POST body
-- Sends `appCertificate` only when `APP_CERTIFICATE` is configured
-- Returns a unified token usable for both RTC and RTM
-- Also wraps generic JSON HTTP POST/GET requests used by `AgentManager`
-- Demo only — production must use your own backend for token generation
+- Generates unified RTC + RTM AccessToken2 locally from `APP_CERTIFICATE`
+- Returns a unified token usable for RTC join, RTM login, and ConvoAI REST auth
+- Mirrors the Kotlin demo structure: `TokenGenerator` validates config and calls `RtcTokenBuilder2`, while `AccessToken2` handles signing and binary packing
+- Demo only — production must use your own backend for token generation and must not ship `APP_CERTIFICATE` in the app
+
+### NetworkManager
+
+- Wraps generic JSON HTTP POST/GET requests used by `AgentManager`
+- Must not contain local token generation logic
 
 ### AgoraAgentClientToolkit
 
@@ -84,7 +89,10 @@ For runtime structure, see `ARCHITECTURE.md`. For entry files, see `README.md`.
 - The quickstart currently reacts to:
   - `onAgentStateChanged`
   - `onTranscriptUpdated`
+  - `onTurnFinished`
   - `onAgentError`
+  - `onMessageError`
+  - `onMessageReceiptUpdated`
   - `onUserManualSosEvent`
   - `onUserManualEosEvent`
   - `onAgentManualEosEvent`
@@ -96,18 +104,17 @@ For runtime structure, see `ARCHITECTURE.md`. For entry files, see `README.md`.
 ### Configuration Flow
 
 ```
-KeyCenter.swift → ViewController / AgentManager / NetworkManager
+KeyCenter.swift → ViewController / AgentManager / NetworkManager / TokenGenerator
 ```
 
-Static credentials are resolved by `KeyCenter.swift` from `Info.plist` build settings first, then from local `VoiceAgent/Secrets.plist`. `VoiceAgent/Secrets.plist` is ignored by Git and must not be committed. For CI or internal builds, inject `APP_ID` and optional `APP_CERTIFICATE` as Xcode build settings. `TOOLBOX_SERVER_HOST` can also be injected to configure the demo token service.
+Static credentials are resolved by `KeyCenter.swift` from `Info.plist` build settings first, then from local `VoiceAgent/Secrets.plist`. `VoiceAgent/Secrets.plist` is ignored by Git and must not be committed. For CI or internal builds, inject `APP_ID` and `APP_CERTIFICATE` as Xcode build settings.
 
 ### Configuration Fields (KeyCenter.swift)
 
 | Field | Description | Required | Default |
 |-------|-------------|----------|---------|
 | `APP_ID` | Agora App ID | ✅ | — |
-| `APP_CERTIFICATE` | Agora App Certificate. Sent to the demo token service only when configured. | ❌ | empty |
-| `TOOLBOX_SERVER_HOST` | Demo token service host | ❌ | empty |
+| `APP_CERTIFICATE` | Agora App Certificate. Required only for the local demo token generator; production apps must keep this on a backend. | ✅ | — |
 | `ASR_VENDOR` | ASR provider name | ❌ | `soniox` |
 | `ASR_API_KEY` | ASR provider key | ❌ | empty |
 | `ASR_MODEL` | ASR model | ❌ | `stt-rt-preview-v2` |
@@ -125,8 +132,7 @@ Static credentials are resolved by `KeyCenter.swift` from `Info.plist` build set
 Make sure to:
 1. Copy `VoiceAgent/Secrets.example.plist` to `VoiceAgent/Secrets.plist`
 2. Fill in `APP_ID` in the local secrets file
-3. Fill in `APP_CERTIFICATE` only when your token service requires it
-4. Fill in `TOOLBOX_SERVER_HOST` to point to the demo token service
+3. Fill in `APP_CERTIFICATE` (required for local token generation)
 
 ### Build-Time Validation
 
@@ -139,16 +145,16 @@ Client directly calls Agora REST API (Demo mode):
 
 | Endpoint | Method | Auth Header | Description |
 |----------|--------|-------------|-------------|
-| `api-test.agora.io/api/conversational-ai-agent/v2/projects/{appId}/join` | POST | `Authorization: agora token=<authToken>` | Start Agent |
-| `api-test.agora.io/api/conversational-ai-agent/v2/projects/{appId}/agents/{agentId}/leave` | POST | `Authorization: agora token=<authToken>` | Stop Agent |
+| `api.agora.io/api/conversational-ai-agent/v2/projects/{appId}/join` | POST | `Authorization: agora token=<authToken>` | Start Agent |
+| `api.agora.io/api/conversational-ai-agent/v2/projects/{appId}/agents/{agentId}/leave` | POST | `Authorization: agora token=<authToken>` | Stop Agent |
 
-Token generated via Demo service (must be replaced with your own backend in production):
+Token generation in Demo mode (must be replaced with your own backend in production):
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `{TOOLBOX_SERVER_HOST}/v2/token/generate` | POST | Generate RTC/RTM Token. Sends `appCertificate` only when configured. |
+| Local `TokenGenerator` AccessToken2 builder | — | Uses `APP_CERTIFICATE` to create a unified RTC + RTM token |
 
-If you need to point to a different backend, change the URL strings in `Tools/AgentManager.swift` and `Tools/NetworkManager.swift`.
+If you need to point to a different backend, change the URL strings in `Tools/AgentManager.swift`.
 
 ### Start Agent Request Body Structure
 
@@ -231,20 +237,18 @@ If you need to point to a different backend, change the URL strings in `Tools/Ag
 }
 ```
 
-### Token Generation Request Body
+### Local AccessToken2 Token Structure
 
-```json
-{
-  "appId": "<APP_ID>",
-  "appCertificate": "<APP_CERTIFICATE, optional>",
-  "channelName": "<channel>",
-  "uid": "<uid>",
-  "types": [1, 2],
-  "expire": 86400,
-  "src": "iOS",
-  "ts": "<timestamp_ms>"
-}
-```
+The demo `TokenGenerator` builds an AccessToken2 locally using:
+
+- `APP_ID` and `APP_CERTIFICATE` from `KeyCenter`
+- `channelName` (the session channel)
+- `uid` (numeric user or agent UID)
+- RTC privileges: join channel, publish audio/video/data streams
+- RTM privileges: RTM login
+- 24-hour expiry
+- Output format: `"007"` prefix + Base64(zlib-deflate(token payload))
+- Token payload contains HMAC-SHA256 signature over signing info (appId, issueTs, expire, salt, services)
 
 ## Data Flow
 
@@ -269,8 +273,9 @@ User Action → ViewController → Agora SDK (RTC/RTM)
 7. Generate `authToken` for REST API authorization
 8. Call `AgentManager.startAgent(parameter, authToken)` to start Agent
 9. AgoraAgentClientToolkit receives agent state / transcript events via RTM → `ViewController` updates UI
-10. If a manual turn capability was enabled at startup, user taps SOS / EOS → `manualSOS(...)` / `manualEOS(...)` publishes the marker and logs the later server result callback
-11. User taps Stop → unsubscribe ConvoAI → stop agent → leave RTC → logout RTM → clear local state
+10. User taps Chat after connection → enters text or an image URL → `chat(...)` publishes a `TextMessage` or `ImageMessage` and later message receipt/error callbacks update the debug log
+11. If a manual turn capability was enabled at startup, user taps SOS / EOS → `manualSOS(...)` / `manualEOS(...)` publishes the marker and logs the later server result callback
+12. User taps Stop → unsubscribe ConvoAI → stop agent → leave RTC → logout RTM → clear local state
 
 ## How to Change Request Parameters
 
@@ -290,13 +295,14 @@ To modify request parameters: edit the `parameter` dictionary in `startAgent()`.
 
 ## Key Constraints
 
-1. **Demo Mode**: Config is resolved by `KeyCenter.swift`; the client directly calls REST API and the demo token service.
-2. **Production**: Sensitive info (`APP_CERTIFICATE`, LLM/STT/TTS keys) must move to your backend; the client should only fetch token/session info from your own server.
-3. **Token Generation**: `NetworkManager.generateToken()` is demo-only; production must use your own server.
-4. **Resource Cleanup**: RTC leave, RTM logout, ConvoAI unsubscribe, and local UI state reset all happen during `endCall()`.
-5. **Permissions**: The app requires microphone access for voice conversation.
-6. **AgoraAgentClientToolkit is read-only for the sample app**: The app must use it through the `AgoraAgentClientToolkit` Pod dependency. Do not copy the component source into `VoiceAgent/` or modify it from the sample app.
-7. **Server Overrides**: If you point the app to a local backend, use the host machine IP, not `localhost` or `127.0.0.1`, when testing on a real device.
+1. **APP_CERTIFICATE is required by the local demo token flow**: This project uses HTTP token auth for REST API. The demo `TokenGenerator` uses `APP_CERTIFICATE` for local AccessToken2 generation.
+2. **Demo Mode**: Config is resolved by `KeyCenter.swift`; the client directly calls REST API.
+3. **Production**: Sensitive info (`APP_CERTIFICATE`, LLM/STT/TTS keys) must move to your backend; the client should only fetch token/session info from your own server and must not embed `APP_CERTIFICATE`.
+4. **Token Generation**: `TokenGenerator.generateTokensAsync()` is demo-only; production must use your own server and must not embed `APP_CERTIFICATE`.
+5. **Resource Cleanup**: RTC leave, RTM logout, ConvoAI unsubscribe, and local UI state reset all happen during `endCall()`.
+6. **Permissions**: The app requires microphone access for voice conversation.
+7. **AgoraAgentClientToolkit is read-only for the sample app**: The app must use it through the `AgoraAgentClientToolkit` Pod dependency. Do not copy the component source into `VoiceAgent/` or modify it from the sample app.
+8. **Server Overrides**: If you point the app to a local backend, use the host machine IP, not `localhost` or `127.0.0.1`, when testing on a real device.
 
 ## Internal Rehoboam Release
 
