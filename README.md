@@ -84,7 +84,7 @@ let convoAIAPI = ConversationalAIAPIImpl(config: config)
 convoAIAPI.addHandler(handler: self)
 ```
 
-Register event callbacks:
+Register your event handler. A typical handler starts with callbacks like:
 
 ```swift
 final class ConversationHandler: NSObject, ConversationalAIAPIEventHandler {
@@ -92,65 +92,15 @@ final class ConversationHandler: NSObject, ConversationalAIAPIEventHandler {
         // Render agent state.
     }
 
-    func onAgentListeningChanged(agentUserId: String, isListening: Bool) {
-        // Handle listening state.
-    }
-
-    func onAgentThinkingChanged(agentUserId: String, isThinking: Bool) {
-        // Handle thinking state.
-    }
-
-    func onAgentSpeakingChanged(agentUserId: String, isSpeaking: Bool) {
-        // Handle speaking state.
-    }
-
-    func onAgentInterrupted(agentUserId: String, event: InterruptEvent) {
-        // Handle interruption.
-    }
-
-    func onAgentMetrics(agentUserId: String, metrics: Metric) {
-        // Observe module latency metrics.
-    }
-
-    func onTurnFinished(agentUserId: String, turn: Turn) {
-        // Observe completed-turn latency.
+    func onTranscriptUpdated(agentUserId: String, transcript: Transcript) {
+        // Render user or agent transcript.
     }
 
     func onAgentError(agentUserId: String, error: ModuleError) {
         // Handle agent-side errors.
     }
 
-    func onMessageError(agentUserId: String, error: MessageError) {
-        // Handle message errors.
-    }
-
-    func onMessageReceiptUpdated(agentUserId: String, messageReceipt: MessageReceipt) {
-        // Handle message receipts.
-    }
-
-    func onAgentVoiceprintStateChanged(agentUserId: String, event: VoiceprintStateChangeEvent) {
-        // Handle voiceprint state changes.
-    }
-
-    func onUserManualSosEvent(agentUserId: String, event: UserManualSosEvent) {
-        // Handle manual SOS result.
-    }
-
-    func onUserManualEosEvent(agentUserId: String, event: UserManualEosEvent) {
-        // Handle manual EOS result.
-    }
-
-    func onAgentManualEosEvent(agentUserId: String, event: AgentManualEosEvent) {
-        // Handle automatic EOS in manual mode.
-    }
-
-    func onTranscriptUpdated(agentUserId: String, transcript: Transcript) {
-        // Render user or agent transcript.
-    }
-
-    func onDebugLog(log: String) {
-        // Forward debug logs if needed.
-    }
+    // Implement the remaining required callbacks for your app.
 }
 ```
 
@@ -201,11 +151,3 @@ For release notes, see [CHANGELOG.md](./CHANGELOG.md).
 ## Maintainers
 
 For CocoaPods / SwiftPM packaging, see [docs/publishing.md](./docs/publishing.md).
-
-## Resources
-
-- [Agora RTC iOS SDK documentation](https://doc.agora.cn/doc/rtc/ios/landing-page)
-- [Agora RTM iOS SDK documentation](https://doc.agora.cn/doc/rtm2/ios/landing-page)
-- [Conversational AI RESTful API documentation](https://doc.agora.cn/doc/convoai/restful/landing-page)
-- [Conversational AI iOS client component documentation](https://doc.agora.cn/api-ref/convoai/ios/ios-component/overview)
-- [Contact Agora Support](https://ticket.agora.cn/)

@@ -89,7 +89,7 @@ Tap Start Agent
   → subscribe RTM channel
   → generate agentToken
   → generate authToken
-  → POST /join with explicit ASR / LLM / TTS config and selected `turn_detection`
+  → POST /join with server default ASR, explicit LLM / TTS config, and selected `turn_detection`
   → save agentId
   → switch to chat view
 ```
@@ -208,9 +208,9 @@ Local credentials should be stored in `VoiceAgent/Secrets.plist`, copied from
 CI or internal builds can inject the same values through Xcode build settings
 named `APP_ID` and `APP_CERTIFICATE`.
 
-Default demo ASR / LLM / TTS values are resolved by `KeyCenter.swift`:
+Default demo LLM / TTS values are resolved by `KeyCenter.swift`:
 
-- ASR: `ASR_VENDOR`, `ASR_API_KEY`, `ASR_MODEL`
+- ASR: server default; no client-side `properties.asr` override
 - LLM: `LLM_URL`, `LLM_API_KEY`, `LLM_MODEL`
 - TTS: `TTS_VENDOR`, `TTS_KEY`, `TTS_MODEL_ID`, `TTS_VOICE_ID`, `TTS_SAMPLE_RATE`
 

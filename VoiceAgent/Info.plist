@@ -6,12 +6,6 @@
 	<string>$(APP_CERTIFICATE)</string>
 	<key>APP_ID</key>
 	<string>$(APP_ID)</string>
-	<key>ASR_API_KEY</key>
-	<string>$(ASR_API_KEY)</string>
-	<key>ASR_MODEL</key>
-	<string>$(ASR_MODEL)</string>
-	<key>ASR_VENDOR</key>
-	<string>$(ASR_VENDOR)</string>
 	<key>LLM_API_KEY</key>
 	<string>$(LLM_API_KEY)</string>
 	<key>LLM_MODEL</key>

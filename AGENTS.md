@@ -9,10 +9,10 @@ This is a complete, runnable iOS demo for real-time voice conversation with an A
 
 ## How to Switch AI Providers
 
-The default RESTful startup flow uses explicit ASR / LLM / TTS blocks. If you need to switch providers, the change is made in `ViewController.swift` → `startAgent()` and `KeyCenter.swift`:
+The default RESTful startup flow uses server default ASR plus explicit LLM / TTS blocks. If you need to switch LLM or TTS providers, the change is made in `ViewController.swift` → `startAgent()` and `KeyCenter.swift`:
 
-1. Update the `ASR_*`, `LLM_*`, and `TTS_*` values in local secrets or build settings
-2. If the selected mode requires extra vendor-specific fields, add only the minimum documented supplemental config under `properties.asr`, `properties.llm`, or `properties.tts`
+1. Update the `LLM_*` and `TTS_*` values in local secrets or build settings
+2. If the selected mode requires extra vendor-specific fields, add only the minimum documented supplemental config under `properties.llm` or `properties.tts`
 
 Supported vendors for STT/TTS/LLM change over time. Refer to the [Start Agent API documentation](https://doc.agora.cn/doc/convoai/restful/convoai/operations/start-agent) for the up-to-date list of supported vendors and their required parameters.
 
@@ -20,7 +20,7 @@ Supported vendors for STT/TTS/LLM change over time. Refer to the [Start Agent AP
 
 Conversational AI Quickstart — iOS real-time voice conversation client built with UIKit.
 
-The client directly calls Agora RESTful API to start/stop Agent, authenticated via HTTP token (`Authorization: agora token=<token>`). The current implementation aligns with the Kotlin demo payload and sends explicit `properties.asr`, `properties.llm`, and `properties.tts` blocks.
+The client directly calls Agora RESTful API to start/stop Agent, authenticated via HTTP token (`Authorization: agora token=<token>`). The current implementation aligns with the Kotlin demo payload, uses server default ASR, and sends explicit `properties.llm` and `properties.tts` blocks.
 
 Current quickstart scope is limited to voice session startup, startup-time SOS / EOS turn detection selection, transcript and latency display, state rendering, interrupt, text / image URL message sending, manual SOS / EOS trigger buttons when enabled, mute, and stop.
 
@@ -59,13 +59,13 @@ For runtime structure, see `ARCHITECTURE.md`. For entry files, see `README.md`.
 
 ### AgentManager
 
-- `startAgent()`: POST `/join`, request body carries session fields plus explicit ASR / LLM / TTS config
-  - `properties.asr` carries `vendor`, `params.api_key`, and `params.model`
+- `startAgent()`: POST `/join`, request body carries session fields plus explicit LLM / TTS config
+  - ASR uses the server default; the demo does not send a `properties.asr` block
   - `properties.llm` carries `url`, `api_key`, `params.model`, `greeting_message`, and `failure_message`
   - `properties.tts` carries `vendor`, `params.key`, `params.model_id`, `params.voice_id`, and `params.sample_rate`
   - `properties.turn_detection` uses `mode: "default"` plus independent `start_of_speech.mode` and `end_of_speech.mode` values selected before startup
-  - Manual SOS / EOS mode sends only `mode: "manual"` for the selected side. Do not include `vad_config` or `semantic_config` for manual mode.
-  - Advanced features: `enable_aivad: false`, `enable_bhvs: true`, `enable_sal: false`, `enable_rtm: true`
+  - Turn detection sends only the selected `mode` for each side. Do not include `vad_config` or `semantic_config`.
+  - Advanced features: `enable_sal: false`, `enable_rtm: true`
   - Remote UIDs: `remote_rtc_uids: ["<currentUserUid>"]`
 - `stopAgent()`: POST `/agents/{agentId}/leave`
 - Authentication: `Authorization: agora token=<authToken>`
@@ -115,9 +115,6 @@ Static credentials are resolved by `KeyCenter.swift` from `Info.plist` build set
 |-------|-------------|----------|---------|
 | `APP_ID` | Agora App ID | ✅ | — |
 | `APP_CERTIFICATE` | Agora App Certificate. Required only for the local demo token generator; production apps must keep this on a backend. | ✅ | — |
-| `ASR_VENDOR` | ASR provider name | ❌ | `soniox` |
-| `ASR_API_KEY` | ASR provider key | ❌ | empty |
-| `ASR_MODEL` | ASR model | ❌ | `stt-rt-preview-v2` |
 | `LLM_URL` | OpenAI-compatible LLM endpoint | ❌ | `https://api.groq.com/openai/v1/chat/completions` |
 | `LLM_API_KEY` | LLM API key | ❌ | empty |
 | `LLM_MODEL` | LLM model | ❌ | `llama-3.3-70b-versatile` |
@@ -169,17 +166,8 @@ If you need to point to a different backend, change the URL strings in `Tools/Ag
     "enable_string_uid": false,
     "idle_timeout": 120,
     "advanced_features": {
-      "enable_aivad": false,
-      "enable_bhvs": true,
       "enable_sal": false,
       "enable_rtm": true
-    },
-    "asr": {
-      "vendor": "soniox",
-      "params": {
-        "api_key": "<ASR_API_KEY>",
-        "model": "stt-rt-preview-v2"
-      }
     },
     "llm": {
       "url": "https://api.groq.com/openai/v1/chat/completions",
@@ -202,34 +190,16 @@ If you need to point to a different backend, change the URL strings in `Tools/Ag
     "parameters": {
       "enable_metrics": true,
       "enable_error_message": true,
-      "output_audio_codec": "OPUSFB",
-      "audio_scenario": "default",
-      "transcript": {
-        "enable": true,
-        "protocol_version": "v2",
-        "enable_words": false
-      },
       "data_channel": "rtm"
     },
     "turn_detection": {
       "mode": "default",
       "config": {
-        "speech_threshold": 0.6,
         "start_of_speech": {
-          "mode": "vad",
-          "vad_config": {
-            "interrupt_duration_ms": 500,
-            "speaking_interrupt_duration_ms": 300,
-            "prefix_padding_ms": 800
-          }
+          "mode": "vad"
         },
         "end_of_speech": {
-          "mode": "semantic",
-          "semantic_config": {
-            "silence_duration_ms": 480,
-            "max_wait_ms": 1200,
-            "pause_state_enabled": false
-          }
+          "mode": "semantic"
         }
       }
     }
@@ -283,15 +253,14 @@ The agent start request body is built in `ViewController.swift` → `startAgent(
 
 | Section | What it controls | Where in the dictionary |
 |---------|------------------|-------------------------|
-| `asr` | Speech-to-text vendor, language, credentials | `properties.asr` |
 | `llm` | LLM endpoint, model, system prompt, greeting/failure messages | `properties.llm` |
 | `tts` | Text-to-speech vendor, voice, speed | `properties.tts` |
 | `parameters` | Data channel (`rtm`), error message toggle | `properties.parameters` |
-| `turn_detection` | SOS / EOS detection mode and mode-specific config | `properties.turn_detection` |
+| `turn_detection` | SOS / EOS detection mode | `properties.turn_detection` |
 | `advanced_features` | RTM enable flag | `properties.advanced_features` |
 | Top-level | Channel name, agent UID, idle timeout, token | `properties.*` |
 
-To modify request parameters: edit the `parameter` dictionary in `startAgent()`. Static values should stay in `KeyCenter.swift`; structural changes should be made in the dictionary itself.
+To modify request parameters: edit the `parameter` dictionary in `startAgent()`. Static LLM / TTS values should stay in `KeyCenter.swift`; ASR uses the server default in the current sample, and structural changes should be made in the dictionary itself.
 
 ## Key Constraints
 

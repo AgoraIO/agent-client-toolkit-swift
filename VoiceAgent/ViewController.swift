@@ -811,61 +811,10 @@ class ViewController: UIViewController {
     }
     
     // MARK: - Agent Management
-    private func startOfSpeechConfig(for mode: TurnDetectionMode) -> [String: Any] {
-        switch mode {
-        case .vad:
-            return [
-                "mode": mode.rawValue,
-                "vad_config": [
-                    "interrupt_duration_ms": 500,
-                    "speaking_interrupt_duration_ms": 300,
-                    "prefix_padding_ms": 800
-                ]
-            ]
-        case .semantic:
-            return [
-                "mode": mode.rawValue,
-                "semantic_config": [
-                    "interrupt_duration_ms": 200,
-                    "prefix_padding_ms": 920,
-                    "speaking_interrupt_duration_ms": 350,
-                    "ignored_words": ignoredTurnDetectionWords()
-                ]
-            ]
-        case .manual:
-            return [
-                "mode": mode.rawValue
-            ]
-        }
-    }
-
-    private func endOfSpeechConfig(for mode: TurnDetectionMode) -> [String: Any] {
-        switch mode {
-        case .vad:
-            return [
-                "mode": mode.rawValue,
-                "vad_config": [
-                    "silence_duration_ms": 660
-                ]
-            ]
-        case .semantic:
-            return [
-                "mode": mode.rawValue,
-                "semantic_config": [
-                    "silence_duration_ms": 480,
-                    "max_wait_ms": 1200,
-                    "pause_state_enabled": false
-                ]
-            ]
-        case .manual:
-            return [
-                "mode": mode.rawValue
-            ]
-        }
-    }
-
-    private func ignoredTurnDetectionWords() -> [String] {
-        return ["uh-huh", "okay"]
+    private func turnDetectionConfig(for mode: TurnDetectionMode) -> [String: Any] {
+        [
+            "mode": mode.rawValue
+        ]
     }
 
     private func startAgent() async throws {
@@ -880,17 +829,8 @@ class ViewController: UIViewController {
                     "enable_string_uid": false,
                     "idle_timeout": 120,
                     "advanced_features": [
-                        "enable_aivad": false,
-                        "enable_bhvs": true,
                         "enable_sal": false,
                         "enable_rtm": true
-                    ],
-                    "asr": [
-                        "vendor": KeyCenter.ASR_VENDOR,
-                        "params": [
-                            "api_key": KeyCenter.ASR_API_KEY,
-                            "model": KeyCenter.ASR_MODEL
-                        ]
                     ],
                     "tts": [
                         "vendor": KeyCenter.TTS_VENDOR,
@@ -913,21 +853,13 @@ class ViewController: UIViewController {
                     "parameters": [
                         "enable_metrics": true,
                         "enable_error_message": true,
-                        "output_audio_codec": "OPUSFB",
-                        "audio_scenario": "default",
-                        "transcript": [
-                            "enable": true,
-                            "protocol_version": "v2",
-                            "enable_words": false
-                        ],
                         "data_channel": "rtm"
                     ],
                     "turn_detection": [
                         "mode": "default",
                         "config": [
-                            "speech_threshold": 0.6,
-                            "start_of_speech": startOfSpeechConfig(for: sosDetectionMode),
-                            "end_of_speech": endOfSpeechConfig(for: eosDetectionMode)
+                            "start_of_speech": turnDetectionConfig(for: sosDetectionMode),
+                            "end_of_speech": turnDetectionConfig(for: eosDetectionMode)
                         ]
                     ]
                 ] as [String: Any]

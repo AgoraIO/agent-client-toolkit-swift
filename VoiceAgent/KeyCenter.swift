@@ -10,9 +10,6 @@ import Foundation
 class KeyCenter {
     static let APP_ID: String = value(for: "APP_ID")
     static let APP_CERTIFICATE: String = value(for: "APP_CERTIFICATE")
-    static let ASR_VENDOR: String = value(for: "ASR_VENDOR", defaultValue: "soniox")
-    static let ASR_API_KEY: String = value(for: "ASR_API_KEY")
-    static let ASR_MODEL: String = value(for: "ASR_MODEL", defaultValue: "stt-rt-preview-v2")
     static let LLM_URL: String = value(for: "LLM_URL", defaultValue: "https://api.groq.com/openai/v1/chat/completions")
     static let LLM_API_KEY: String = value(for: "LLM_API_KEY")
     static let LLM_MODEL: String = value(for: "LLM_MODEL", defaultValue: "llama-3.3-70b-versatile")
