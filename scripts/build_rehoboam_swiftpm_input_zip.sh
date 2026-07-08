@@ -2,9 +2,11 @@
 set -euo pipefail
 
 COMPONENT_NAME="AgoraAgentClientToolkit"
+PACKAGE_NAME="agent-client-toolkit-swift"
+PACKAGE_BASENAME="agora-agent-client-toolkit"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKSPACE="${WORKSPACE:-$ROOT_DIR/VoiceAgent.xcworkspace}"
-SCHEME="${SCHEME:-$COMPONENT_NAME}"
+SCHEME="${SCHEME:-$PACKAGE_NAME}"
 CONFIGURATION="${CONFIGURATION:-Release}"
 CLEAN_DERIVED_DATA="${CLEAN_DERIVED_DATA:-1}"
 EXISTING_XCFRAMEWORK="${EXISTING_XCFRAMEWORK:-}"
@@ -21,12 +23,12 @@ if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
   exit 1
 fi
 
-RUN_ROOT="${RUN_ROOT:-$ROOT_DIR/build/internal-spm/$COMPONENT_NAME-$VERSION-rehoboam-$RUN_ID}"
-XCODE_WORK_ROOT="${XCODE_WORK_ROOT:-/private/tmp/$COMPONENT_NAME-spm-rehoboam-xcode}"
+RUN_ROOT="${RUN_ROOT:-$ROOT_DIR/build/internal-spm/$PACKAGE_BASENAME-$VERSION-swiftpm-$RUN_ID}"
+XCODE_WORK_ROOT="${XCODE_WORK_ROOT:-/private/tmp/$PACKAGE_BASENAME-spm-rehoboam-xcode}"
 ARCHIVES_DIR="${ARCHIVES_DIR:-$XCODE_WORK_ROOT/$RUN_ID/archives}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$XCODE_WORK_ROOT/$RUN_ID/DerivedData}"
 INPUT_ROOT="$RUN_ROOT/input"
-INPUT_ZIP="$RUN_ROOT/$COMPONENT_NAME-$VERSION-rehoboam-input.zip"
+INPUT_ZIP="$RUN_ROOT/$PACKAGE_BASENAME-$VERSION-swiftpm-rehoboam-input.zip"
 XCFRAMEWORK_PATH="$INPUT_ROOT/swiftpm_template/sdk/$COMPONENT_NAME/$COMPONENT_NAME.xcframework"
 DEVICE_ARCHIVE="$ARCHIVES_DIR/$COMPONENT_NAME-iOS.xcarchive"
 SIMULATOR_ARCHIVE="$ARCHIVES_DIR/$COMPONENT_NAME-iOS-Simulator.xcarchive"

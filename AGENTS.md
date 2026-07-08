@@ -36,7 +36,7 @@ Current quickstart scope is limited to voice session startup, startup-time SOS /
 | Networking | `URLSession` |
 | RTC SDK | Agora RTC SDK (`AgoraRtcEngine_iOS` 4.5.1) |
 | RTM SDK | Agora RTM SDK (`AgoraRtm/RtmKit` 2.2.3) |
-| AgoraAgentClientToolkit | Local Pod component, do not modify from the sample app |
+| AgoraAgentClientToolkit | Swift module from local CocoaPods pod `agent-client-toolkit-swift`; do not modify from the sample app |
 
 For runtime structure, see `ARCHITECTURE.md`. For entry files, see `README.md`.
 
@@ -84,7 +84,7 @@ For runtime structure, see `ARCHITECTURE.md`. For entry files, see `README.md`.
 
 ### AgoraAgentClientToolkit
 
-- Provides the `ConversationalAIAPI` types through the local Pod dependency
+- Provides the `ConversationalAIAPI` types through the local CocoaPods pod `agent-client-toolkit-swift` and Swift module `AgoraAgentClientToolkit`
 - Wraps RTM message subscription/parsing
 - The quickstart currently reacts to:
   - `onAgentStateChanged`
@@ -270,7 +270,7 @@ To modify request parameters: edit the `parameter` dictionary in `startAgent()`.
 4. **Token Generation**: `TokenGenerator.generateTokensAsync()` is demo-only; production must use your own server and must not embed `APP_CERTIFICATE`.
 5. **Resource Cleanup**: RTC leave, RTM logout, ConvoAI unsubscribe, and local UI state reset all happen during `endCall()`.
 6. **Permissions**: The app requires microphone access for voice conversation.
-7. **AgoraAgentClientToolkit is read-only for the sample app**: The app must use it through the `AgoraAgentClientToolkit` Pod dependency. Do not copy the component source into `VoiceAgent/` or modify it from the sample app.
+7. **AgoraAgentClientToolkit is read-only for the sample app**: The app must use it through the `agent-client-toolkit-swift` Pod dependency and import the `AgoraAgentClientToolkit` Swift module. Do not copy the component source into `VoiceAgent/` or modify it from the sample app.
 8. **Server Overrides**: If you point the app to a local backend, use the host machine IP, not `localhost` or `127.0.0.1`, when testing on a real device.
 
 ## Internal Rehoboam Release
@@ -296,8 +296,8 @@ VERSION=2.9.0-rc.1 scripts/build_rehoboam_swiftpm_input_zip.sh
 The generated zips are:
 
 ```text
-build/internal-cocoapods/AgoraAgentClientToolkit-<version>-<timestamp>/AgoraAgentClientToolkit-<version>.zip
-build/internal-spm/AgoraAgentClientToolkit-<version>-rehoboam-<timestamp>/AgoraAgentClientToolkit-<version>-rehoboam-input.zip
+build/internal-cocoapods/agora-agent-client-toolkit-<version>-<timestamp>/agora-agent-client-toolkit-<version>-cocoapods-rehoboam-input.zip
+build/internal-spm/agora-agent-client-toolkit-<version>-swiftpm-<timestamp>/agora-agent-client-toolkit-<version>-swiftpm-rehoboam-input.zip
 ```
 
 Use the same explicit `VERSION` for CocoaPods and SwiftPM when they are released together. The scripts require a non-SNAPSHOT version.

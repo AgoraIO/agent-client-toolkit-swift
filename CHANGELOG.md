@@ -10,7 +10,7 @@ Initial public release.
 
 ### Added
 
-- Published `AgoraAgentClientToolkit` as the iOS ConvoAI client toolkit for CocoaPods and Swift Package Manager.
+- Published `agent-client-toolkit-swift` as the iOS ConvoAI client toolkit for CocoaPods and Swift Package Manager.
 - Added `ConversationalAIAPIImpl` and `ConversationalAIAPIProtocol` for host apps that already manage Agora RTC and RTM engine instances.
 - Added transcript parsing and rendering support through `TranscriptRenderMode`, `Transcript`, `TranscriptType`, and `TranscriptStatus`.
 - Added agent state callbacks for state, listening, thinking, speaking, interrupt, metrics, turn-finished latency, message receipt, message error, module error, and voiceprint status events.
@@ -21,8 +21,11 @@ Initial public release.
 
 ### Compatibility
 
-- CocoaPods name and Swift module: `AgoraAgentClientToolkit`.
-- SwiftPM package identity: `agent-client-toolkit-swift`.
+| Integration | Add dependency | Swift code |
+|-------------|----------------|------------|
+| CocoaPods | `pod 'agent-client-toolkit-swift', '2.9.0'` | `import AgoraAgentClientToolkit` |
+| SwiftPM | Package URL `https://github.com/AgoraIO/agent-client-toolkit-swift.git`, tag `2.9.0`, product `AgoraAgentClientToolkit` | `import AgoraAgentClientToolkit` |
+
 - Minimum iOS version: 15.0.
 - Swift version: 5.0.
 - CocoaPods dependencies: `AgoraRtcEngine_iOS >= 4.5.1` and `AgoraRtm/RtmKit >= 2.2.3`.

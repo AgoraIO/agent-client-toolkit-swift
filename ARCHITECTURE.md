@@ -63,8 +63,8 @@ ios-swift/
 │   │   └── AccessToken2.swift
 └── VoiceAgent.xcworkspace
 
-AgoraAgentClientToolkit is consumed through the local Pod dependency declared in
-`Podfile`.
+The demo consumes the local CocoaPods pod `agent-client-toolkit-swift` declared
+in `Podfile`, while Swift code imports the `AgoraAgentClientToolkit` module.
 ```
 
 ## Runtime Shape
@@ -75,8 +75,8 @@ RTC / RTM / ConversationalAIAPI /
 TokenGenerator / NetworkManager / AgentManager
 ```
 
-`ConversationalAIAPI` types are provided by the `AgoraAgentClientToolkit` Pod,
-which parses RTM payloads and emits agent / transcript callbacks.
+`ConversationalAIAPI` types are provided by the `AgoraAgentClientToolkit` Swift
+module, which parses RTM payloads and emits agent / transcript callbacks.
 
 ## Connection Flow (User taps Start Agent)
 
@@ -218,5 +218,5 @@ Default demo LLM / TTS values are resolved by `KeyCenter.swift`:
 
 - This is a demo; token generation and agent startup are client-side for convenience
 - Production should move token generation and REST startup to a backend and must not embed `APP_CERTIFICATE`
-- `AgoraAgentClientToolkit` should be consumed through Pod dependency and not
-  copied into `VoiceAgent/`
+- `AgoraAgentClientToolkit` should be consumed through the
+  `agent-client-toolkit-swift` Pod dependency and not copied into `VoiceAgent/`

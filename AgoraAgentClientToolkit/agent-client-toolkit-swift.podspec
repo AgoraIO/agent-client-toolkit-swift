@@ -1,5 +1,5 @@
 Pod::Spec.new do |s|
-  s.name = 'AgoraAgentClientToolkit'
+  s.name = 'agent-client-toolkit-swift'
   s.module_name = 'AgoraAgentClientToolkit'
   s.version = '2.9.0'
   s.summary = 'Client-side toolkit for Agora Conversational AI on iOS.'

@@ -12,9 +12,12 @@ Choose one package manager to integrate `AgoraAgentClientToolkit`. Do not integr
 target 'YourApp' do
   use_frameworks!
 
-  pod 'AgoraAgentClientToolkit', '2.9.0'
+  pod 'agent-client-toolkit-swift', '2.9.0'
 end
 ```
+
+The CocoaPods package name is `agent-client-toolkit-swift`; the Swift module
+you import in code remains `AgoraAgentClientToolkit`.
 
 If your project uses a custom or private CocoaPods specs repository, add that source at the top of your `Podfile`.
 

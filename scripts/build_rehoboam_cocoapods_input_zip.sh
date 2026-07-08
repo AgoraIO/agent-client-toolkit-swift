@@ -2,13 +2,15 @@
 set -euo pipefail
 
 COMPONENT_NAME="AgoraAgentClientToolkit"
+POD_NAME="agent-client-toolkit-swift"
+PACKAGE_BASENAME="agora-agent-client-toolkit"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKSPACE="${WORKSPACE:-$ROOT_DIR/VoiceAgent.xcworkspace}"
-SCHEME="${SCHEME:-$COMPONENT_NAME}"
+SCHEME="${SCHEME:-$POD_NAME}"
 CONFIGURATION="${CONFIGURATION:-Release}"
-PODSPEC_TEMPLATE="${PODSPEC_TEMPLATE:-$ROOT_DIR/AgoraAgentClientToolkit/$COMPONENT_NAME.binary.podspec.template}"
-XCODE_WORK_ROOT="${XCODE_WORK_ROOT:-/private/tmp/$COMPONENT_NAME-internal-cocoapods-xcode}"
-PACKAGE_WORK_ROOT="${PACKAGE_WORK_ROOT:-/private/tmp/$COMPONENT_NAME-cocoapods-package}"
+PODSPEC_TEMPLATE="${PODSPEC_TEMPLATE:-$ROOT_DIR/AgoraAgentClientToolkit/$POD_NAME.binary.podspec.template}"
+XCODE_WORK_ROOT="${XCODE_WORK_ROOT:-/private/tmp/$PACKAGE_BASENAME-internal-cocoapods-xcode}"
+PACKAGE_WORK_ROOT="${PACKAGE_WORK_ROOT:-/private/tmp/$PACKAGE_BASENAME-cocoapods-package}"
 CLEAN_DERIVED_DATA="${CLEAN_DERIVED_DATA:-1}"
 KEEP_STAGING="${KEEP_STAGING:-0}"
 VERSION="${VERSION:-}"
@@ -34,17 +36,17 @@ if [[ ! -f "$PODSPEC_TEMPLATE" ]]; then
 fi
 
 RUN_ID="$(date +%Y%m%d%H%M%S)"
-RUN_ROOT="${RUN_ROOT:-$ROOT_DIR/build/internal-cocoapods/$COMPONENT_NAME-$VERSION-$RUN_ID}"
+RUN_ROOT="${RUN_ROOT:-$ROOT_DIR/build/internal-cocoapods/$PACKAGE_BASENAME-$VERSION-$RUN_ID}"
 ARCHIVES_DIR="${ARCHIVES_DIR:-$XCODE_WORK_ROOT/$RUN_ID/archives}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$XCODE_WORK_ROOT/$RUN_ID/DerivedData}"
 STAGING_ROOT="${STAGING_ROOT:-$PACKAGE_WORK_ROOT/$RUN_ID/staging}"
 SDK_DIR="$STAGING_ROOT/sdk"
-ZIP_PATH="${ZIP_PATH:-$RUN_ROOT/$COMPONENT_NAME-$VERSION.zip}"
+ZIP_PATH="${ZIP_PATH:-$RUN_ROOT/$PACKAGE_BASENAME-$VERSION-cocoapods-rehoboam-input.zip}"
 
 DEVICE_ARCHIVE="$ARCHIVES_DIR/$COMPONENT_NAME-iOS.xcarchive"
 SIMULATOR_ARCHIVE="$ARCHIVES_DIR/$COMPONENT_NAME-iOS-Simulator.xcarchive"
 XCFRAMEWORK_PATH="$SDK_DIR/$COMPONENT_NAME.xcframework"
-STAGED_PODSPEC="$STAGING_ROOT/$COMPONENT_NAME.podspec"
+STAGED_PODSPEC="$STAGING_ROOT/$POD_NAME.podspec"
 
 cleanup() {
   if [[ "$KEEP_STAGING" != "1" ]]; then
@@ -103,7 +105,7 @@ fi
 echo "Creating Rehoboam CocoaPods input zip..."
 (
   cd "$STAGING_ROOT"
-  /usr/bin/zip -qry "$ZIP_PATH" "$COMPONENT_NAME.podspec" sdk
+  /usr/bin/zip -qry "$ZIP_PATH" "$POD_NAME.podspec" sdk
 )
 
 echo "Rehoboam CocoaPods input zip: $ZIP_PATH"
