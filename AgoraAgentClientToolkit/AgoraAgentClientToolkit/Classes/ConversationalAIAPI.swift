@@ -1114,7 +1114,7 @@ public enum MessageType: String, CaseIterable {
     ///  @param scenario Audio scenario, default is .aiClient
     ///               - For Avatar: Use .default
     ///              - For standard mode: Use .aiClient
-    @objc func loadAudioSettings(secnario: AgoraAudioScenario)
+    @objc func loadAudioSettings(scenario: AgoraAudioScenario)
     
     /// Subscribe to channel messages
     /// Set the channel parameters and callback for message subscription.

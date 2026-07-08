@@ -125,16 +125,16 @@ extension ConversationalAIAPIImpl: ConversationalAIAPI {
     }
     
     @objc public func loadAudioSettings() {
-        loadAudioSettings(secnario: .aiClient)
+        loadAudioSettings(scenario: .aiClient)
     }
-    
-    @objc public func loadAudioSettings(secnario: AgoraAudioScenario) {
-        callMessagePrint(msg: ">>> [loadAudioSettings] secnairo: \(secnario)")
-        self.config.rtcEngine?.setAudioScenario(secnario)
-        
+
+    @objc public func loadAudioSettings(scenario: AgoraAudioScenario) {
+        callMessagePrint(msg: ">>> [loadAudioSettings] scenario: \(scenario)")
+        self.config.rtcEngine?.setAudioScenario(scenario)
+
         setAudioConfigParameters(routing: audioRouting)
     }
-    
+
     @objc public func subscribeMessage(channelName: String, completion: @escaping (ConversationalAIAPIError?) -> Void) {
         guard let rtmEngine = self.config.rtmEngine else {
             return

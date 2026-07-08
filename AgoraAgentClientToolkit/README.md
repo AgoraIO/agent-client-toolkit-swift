@@ -125,7 +125,7 @@ func interrupt(agentUserId: String, completion: @escaping (ConversationalAIAPIEr
 func manualSOS(agentUserId: String, completion: @escaping (String, ConversationalAIAPIError?) -> Void)
 func manualEOS(agentUserId: String, completion: @escaping (String, ConversationalAIAPIError?) -> Void)
 func loadAudioSettings()
-func loadAudioSettings(secnario: AgoraAudioScenario)
+func loadAudioSettings(scenario: AgoraAudioScenario)
 func destroy()
 ```
 
@@ -138,7 +138,7 @@ methods.
 For Avatar mode, use:
 
 ```swift
-conversationalAIAPI.loadAudioSettings(secnario: .default)
+conversationalAIAPI.loadAudioSettings(scenario: .default)
 ```
 
 For standard voice mode, use:
