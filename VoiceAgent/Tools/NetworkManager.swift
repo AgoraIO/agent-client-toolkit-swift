@@ -54,7 +54,9 @@ public class NetworkManager: NSObject {
                                        headers: headers,
                                        success: success,
                                        failure: failure) else { return }
-        print("[NetworkManager] Request cURL: \(request.cURL(pretty: true))")
+        #if DEBUG
+        print("[NetworkManager] Request cURL: \(request.redactedCURL(pretty: true))")
+        #endif
         session.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 self.checkResponse(response: response, data: data, success: success, failure: failure)
@@ -109,12 +111,21 @@ public class NetworkManager: NSObject {
 
         if let httpResponse = response as? HTTPURLResponse {
             switch httpResponse.statusCode {
-            case 200...201:
-                if let resultData = data {
-                    let result = try? JSONSerialization.jsonObject(with: resultData)
-                    success?(result as! [String : Any])
-                } else {
-                    failure?("Error in the request status code \(httpResponse.statusCode), response: \(String(describing: response)), body: \(responseBody)")
+            case 200...299:
+                guard let resultData = data, !resultData.isEmpty else {
+                    success?([:])
+                    return
+                }
+
+                do {
+                    let result = try JSONSerialization.jsonObject(with: resultData)
+                    guard let object = result as? [String: Any] else {
+                        failure?("Invalid JSON object response for status code \(httpResponse.statusCode), body: \(responseBody)")
+                        return
+                    }
+                    success?(object)
+                } catch {
+                    failure?("Invalid JSON response for status code \(httpResponse.statusCode), error: \(error.localizedDescription), body: \(responseBody)")
                 }
             default:
                 failure?("Error in the request status code \(httpResponse.statusCode), response: \(String(describing: response)), body: \(responseBody)")
@@ -125,29 +136,32 @@ public class NetworkManager: NSObject {
     }
 }
 
-public extension URLRequest {
-    func cURL(pretty: Bool = false) -> String {
+#if DEBUG
+private extension URLRequest {
+    func redactedCURL(pretty: Bool = false) -> String {
         let newLine = pretty ? "\\\n" : ""
         let method = (pretty ? "--request " : "-X ") + "\(httpMethod ?? "GET") \(newLine)"
-        let url: String = (pretty ? "--url " : "") + "\'\(url?.absoluteString ?? "")\' \(newLine)"
+        let url: String = (pretty ? "--url " : "") + "'\(redactedURLString())' \(newLine)"
 
         var cURL = "curl "
         var header = ""
         var data = ""
 
-        if let httpHeaders = allHTTPHeaderFields, httpHeaders.keys.count > 0 {
-            for (key, value) in httpHeaders {
+        if let httpHeaders = allHTTPHeaderFields, !httpHeaders.isEmpty {
+            for key in httpHeaders.keys.sorted() {
+                guard let value = httpHeaders[key] else { continue }
+                let redactedValue = Self.redactedHeaderValue(key: key, value: value)
                 if key.lowercased() == "content-type" && value.lowercased().contains("multipart/form-data") {
-                    header += (pretty ? "--header " : "-H ") + "\'\(key): \(value)\' \(newLine)"
+                    header += (pretty ? "--header " : "-H ") + "'\(key): \(redactedValue)' \(newLine)"
                     data = "--data '@image_data'"
                     continue
                 }
-                header += (pretty ? "--header " : "-H ") + "\'\(key): \(value)\' \(newLine)"
+                header += (pretty ? "--header " : "-H ") + "'\(key): \(redactedValue)' \(newLine)"
             }
         }
 
         if data.isEmpty, let bodyData = httpBody {
-            if let bodyString = String(data: bodyData, encoding: .utf8), !bodyString.isEmpty {
+            if let bodyString = redactedBodyString(from: bodyData), !bodyString.isEmpty {
                 data = "--data '\(bodyString)'"
             } else {
                 data = "--data '@binary_data'"
@@ -158,7 +172,107 @@ public extension URLRequest {
 
         return cURL
     }
+
+    static func shouldFullyRedact(key: String) -> Bool {
+        let normalizedKey = key.lowercased()
+        return normalizedKey.contains("secret")
+            || normalizedKey.contains("certificate")
+    }
+
+    static func shouldPartiallyRedact(key: String) -> Bool {
+        let normalizedKey = key.lowercased()
+        return normalizedKey.contains("authorization")
+            || normalizedKey.contains("app_id")
+            || normalizedKey.contains("token")
+            || normalizedKey.contains("api_key")
+            || normalizedKey.contains("apikey")
+            || normalizedKey == "key"
+            || normalizedKey == "voice_id"
+    }
+
+    static func partialRedactionPrefixLength(key: String) -> Int {
+        let normalizedKey = key.lowercased()
+        if normalizedKey.contains("app_id") || normalizedKey == "voice_id" {
+            return 2
+        }
+        return 3
+    }
+
+    static func partiallyRedact(_ value: String, prefixLength: Int = 3) -> String {
+        let prefix = String(value.prefix(prefixLength))
+        return prefix.isEmpty ? "<redacted>" : "\(prefix)***"
+    }
+
+    static func redactedHeaderValue(key: String, value: String) -> String {
+        if shouldFullyRedact(key: key) {
+            return "<redacted>"
+        }
+
+        guard shouldPartiallyRedact(key: key) else {
+            return value
+        }
+
+        if key.lowercased().contains("authorization") {
+            let prefix = "agora token="
+            if value.lowercased().hasPrefix(prefix) {
+                let token = String(value.dropFirst(prefix.count))
+                return prefix + partiallyRedact(token, prefixLength: 3)
+            }
+        }
+
+        return partiallyRedact(value, prefixLength: partialRedactionPrefixLength(key: key))
+    }
+
+    func redactedURLString() -> String {
+        guard let url else { return "" }
+        var redactedURL = url.absoluteString
+        let projectPattern = #"/projects/([^/]+)"#
+        let range = NSRange(location: 0, length: redactedURL.utf16.count)
+        guard let regex = try? NSRegularExpression(pattern: projectPattern),
+              let match = regex.firstMatch(in: redactedURL, options: [], range: range),
+              let appIdRange = Range(match.range(at: 1), in: redactedURL) else {
+            return redactedURL
+        }
+
+        redactedURL.replaceSubrange(appIdRange, with: Self.partiallyRedact(String(redactedURL[appIdRange]), prefixLength: 2))
+        return redactedURL
+    }
+
+    func redactedBodyString(from bodyData: Data) -> String? {
+        guard let jsonObject = try? JSONSerialization.jsonObject(with: bodyData) else {
+            return String(data: bodyData, encoding: .utf8)
+        }
+
+        let redactedObject = Self.redact(jsonObject)
+        guard let redactedData = try? JSONSerialization.data(withJSONObject: redactedObject, options: .sortedKeys) else {
+            return String(data: bodyData, encoding: .utf8)
+        }
+        return String(data: redactedData, encoding: .utf8)
+    }
+
+    static func redact(_ value: Any) -> Any {
+        if let dictionary = value as? [String: Any] {
+            var redacted: [String: Any] = [:]
+            for (key, value) in dictionary {
+                if shouldFullyRedact(key: key) {
+                    redacted[key] = "<redacted>"
+                } else if shouldPartiallyRedact(key: key), let stringValue = value as? String {
+                    redacted[key] = partiallyRedact(stringValue, prefixLength: partialRedactionPrefixLength(key: key))
+                } else {
+                    redacted[key] = redact(value)
+                }
+            }
+            return redacted
+        }
+
+        if let array = value as? [Any] {
+            return array.map { redact($0) }
+        }
+
+        return value
+    }
 }
+#endif
 
 extension String {
     func appendingParameters(parameters: [String: Any]?) -> String {

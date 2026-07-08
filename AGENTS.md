@@ -99,6 +99,17 @@ For runtime structure, see `ARCHITECTURE.md`. For entry files, see `README.md`.
 - Render mode is `.words`
 - Initialized with both RTC and RTM engines after SDK setup
 
+## Startup Review Guardrails
+
+For AI / PR reviews, use the current demo flow and business rules as the source of truth. Do not propose generic startup refactors unless they fix a concrete violation.
+
+- `loadAudioSettings()` must run before RTC `joinChannel`.
+- RTM login, RTC join, message subscription, and token generation may be sequenced differently from Kotlin when the platform code is clearer, but `AgentManager.startAgent(...)` must wait until RTC joined, RTM message subscribed, `agentToken` ready, `authToken` ready, and startup-time SOS / EOS modes selected.
+- ConvoAI message subscription must complete before `AgentManager.startAgent(...)`.
+- Connected UI is opened only after `/join` returns a non-empty `agentId`. Agent state, transcript, and agent-side errors must still come from AgoraAgentClientToolkit callbacks, not local fabrication.
+- `endCall()` owns both the stop request and local cleanup path. Local state, `agentId`, RTC, RTM, and message subscription cleanup must not depend on late RTM events.
+- Keep `SessionStartupState` simple. Do not add extra milestone models, login-state layers, or attempt identifiers beyond the existing flow unless there is a proven business bug.
+
 ## Configuration
 
 ### Configuration Flow
