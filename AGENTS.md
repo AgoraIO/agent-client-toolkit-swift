@@ -290,18 +290,15 @@ Rehoboam is the internal release platform for both CocoaPods and SwiftPM. Do not
 
 Release strategy:
 
-- Do not use the final release version as the first validation artifact.
-- Package and publish an RC first, for example `2.9.0-rc.1`.
-- Validate the RC through Rehoboam platform validation plus sample or clean-app consumption.
-- If fixes are needed before formal publish, drop the staging deployment and publish the next RC.
-- Publish the final version, for example `2.9.0`, only after the RC passes.
+- Publish only formal SemVer versions, for example `2.9.0`; do not publish prerelease or SNAPSHOT versions.
+- Complete package plus sample or clean-app validation before formal publication.
 - If a problem is found after the final version is published, do not overwrite or delete that version; publish a new version such as `2.9.1`.
 
 To prepare the Rehoboam upload zips:
 
 ```bash
-VERSION=2.9.0-rc.1 scripts/build_rehoboam_cocoapods_input_zip.sh
-VERSION=2.9.0-rc.1 scripts/build_rehoboam_swiftpm_input_zip.sh
+VERSION=2.9.0 scripts/build_rehoboam_cocoapods_input_zip.sh
+VERSION=2.9.0 scripts/build_rehoboam_swiftpm_input_zip.sh
 ```
 
 The generated zips are:
@@ -311,7 +308,7 @@ build/internal-cocoapods/agora-agent-client-toolkit-<version>-<timestamp>/agora-
 build/internal-spm/agora-agent-client-toolkit-<version>-swiftpm-<timestamp>/agora-agent-client-toolkit-<version>-swiftpm-rehoboam-input.zip
 ```
 
-Use the same explicit `VERSION` for CocoaPods and SwiftPM when they are released together. The scripts require a non-SNAPSHOT version.
+Use the same explicit `VERSION` for CocoaPods and SwiftPM when they are released together. The scripts require a formal SemVer version and reject prerelease or SNAPSHOT versions.
 
 ## File Naming
 

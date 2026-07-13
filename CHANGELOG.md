@@ -4,6 +4,12 @@ All notable changes to the iOS Agora Conversational AI Toolkit will be documente
 
 The format follows Keep a Changelog style. This first public release establishes the compatibility baseline for future iOS releases.
 
+## [Unreleased]
+
+### Deprecated
+
+- Deprecated the aggregate `onAgentStateChanged(...)` callback in favor of independent `onAgentListeningChanged(...)`, `onAgentThinkingChanged(...)`, and `onAgentSpeakingChanged(...)` callbacks. The aggregate callback remains supported, required by the protocol, and continues to be delivered for existing integrations.
+
 ## [2.9.0] - 2026-07-02
 
 Initial public release.

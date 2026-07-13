@@ -16,12 +16,12 @@ KEEP_STAGING="${KEEP_STAGING:-0}"
 VERSION="${VERSION:-}"
 
 if [[ -z "$VERSION" ]]; then
-  echo "Unable to resolve version. Pass VERSION=2.9.0-rc.1." >&2
+  echo "Unable to resolve version. Pass VERSION=2.9.0." >&2
   exit 1
 fi
 
-if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
-  echo "Rehoboam CocoaPods input zip requires a non-SNAPSHOT version: $VERSION" >&2
+if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+  echo "Only formal SemVer versions are allowed: $VERSION" >&2
   exit 1
 fi
 

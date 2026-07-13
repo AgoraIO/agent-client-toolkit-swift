@@ -47,8 +47,11 @@ Register event callbacks:
 ```swift
 final class ConversationHandler: NSObject, ConversationalAIAPIEventHandler {
     func onAgentStateChanged(agentUserId: String, event: StateChangeEvent) {
-        // Render agent state.
+        // Existing aggregate-state integrations remain supported.
     }
+    func onAgentListeningChanged(agentUserId: String, isListening: Bool) {}
+    func onAgentThinkingChanged(agentUserId: String, isThinking: Bool) {}
+    func onAgentSpeakingChanged(agentUserId: String, isSpeaking: Bool) {}
 
     func onTranscriptUpdated(agentUserId: String, transcript: Transcript) {
         // Render user or agent transcript.
@@ -72,6 +75,10 @@ final class ConversationHandler: NSObject, ConversationalAIAPIEventHandler {
 let handler = ConversationHandler()
 conversationalAIAPI.addHandler(handler: handler)
 ```
+
+`onAgentStateChanged` is deprecated but remains supported, required by the
+protocol, and continues to be delivered. Existing integrations do not need to
+migrate. Use the independent callbacks when multiple activity flags are needed.
 
 Load audio settings before joining RTC, then subscribe to the RTM message channel after RTC/RTM are ready:
 
@@ -153,10 +160,10 @@ Implement `ConversationalAIAPIEventHandler` to receive callbacks.
 
 | Callback | Payload | Description |
 |----------|---------|-------------|
-| `onAgentStateChanged` | `StateChangeEvent` | Agent lifecycle state changed |
-| `onAgentListeningChanged` | `Bool` | Convenience callback for listening state |
-| `onAgentThinkingChanged` | `Bool` | Convenience callback for thinking state |
-| `onAgentSpeakingChanged` | `Bool` | Convenience callback for speaking state |
+| `onAgentStateChanged` | `StateChangeEvent` | Deprecated but supported aggregate lifecycle state |
+| `onAgentListeningChanged` | `Bool` | Independent listening state (recommended) |
+| `onAgentThinkingChanged` | `Bool` | Independent thinking state (recommended) |
+| `onAgentSpeakingChanged` | `Bool` | Independent speaking state (recommended) |
 | `onAgentInterrupted` | `InterruptEvent` | Agent turn was interrupted |
 | `onAgentMetrics` | `Metric` | Module latency or performance metric |
 | `onTurnFinished` | `Turn` | Completed-turn latency data |

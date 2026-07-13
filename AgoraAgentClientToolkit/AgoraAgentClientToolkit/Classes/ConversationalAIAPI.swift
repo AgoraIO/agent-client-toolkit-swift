@@ -905,7 +905,7 @@ public enum MessageType: String, CaseIterable {
 /// This protocol defines callback interfaces for receiving Agent conversation events,
 /// state changes, performance metrics, errors, and transcript updates.
 @objc public protocol ConversationalAIAPIEventHandler: AnyObject {
-    /// Called when AI agent state changes
+    /// Called when the aggregate AI agent state changes.
     /// This method is called whenever the agent transitions between different states
     /// (such as idle, silent, listening, thinking, or speaking).
     /// Can be used to update UI interface or track conversation flow.
@@ -913,6 +913,9 @@ public enum MessageType: String, CaseIterable {
     /// - Parameters:
     ///   - agentUserId: Agent RTM user ID
     ///   - event: Agent state change event containing state, turn ID, timestamp, and reason
+    /// - Deprecated: Use `onAgentListeningChanged`, `onAgentThinkingChanged`, and
+    ///   `onAgentSpeakingChanged` so independent activity flags are not collapsed.
+    @available(*, deprecated, message: "Use onAgentListeningChanged, onAgentThinkingChanged, and onAgentSpeakingChanged instead.")
     @objc func onAgentStateChanged(agentUserId: String, event: StateChangeEvent)
 
     /// Called when agent listening state changes

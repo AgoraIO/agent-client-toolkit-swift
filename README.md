@@ -92,8 +92,11 @@ Register your event handler. A typical handler starts with callbacks like:
 ```swift
 final class ConversationHandler: NSObject, ConversationalAIAPIEventHandler {
     func onAgentStateChanged(agentUserId: String, event: StateChangeEvent) {
-        // Render agent state.
+        // Existing aggregate-state integrations remain supported.
     }
+    func onAgentListeningChanged(agentUserId: String, isListening: Bool) {}
+    func onAgentThinkingChanged(agentUserId: String, isThinking: Bool) {}
+    func onAgentSpeakingChanged(agentUserId: String, isSpeaking: Bool) {}
 
     func onTranscriptUpdated(agentUserId: String, transcript: Transcript) {
         // Render user or agent transcript.
@@ -106,6 +109,11 @@ final class ConversationHandler: NSObject, ConversationalAIAPIEventHandler {
     // Implement the remaining required callbacks for your app.
 }
 ```
+
+The aggregate `onAgentStateChanged` callback is deprecated but remains supported,
+required by the protocol, and continues to be delivered. Existing integrations
+do not need to migrate. Use the independent callbacks when the UI needs listening,
+thinking, and speaking flags that may be active at the same time.
 
 Load audio settings before joining RTC, then subscribe to the RTM message channel after RTC/RTM are ready:
 

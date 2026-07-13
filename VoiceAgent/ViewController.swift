@@ -241,6 +241,9 @@ class ViewController: UIViewController {
     private var isLatencyMetricsVisible: Bool = true
     private var isMicMuted: Bool = false
     private var currentAgentState: AgentState = .unknown
+    private var isAgentListening = false
+    private var isAgentThinking = false
+    private var isAgentSpeaking = false
     private var startupState = SessionStartupState()
     private var sosDetectionMode: TurnDetectionMode = .vad
     private var eosDetectionMode: TurnDetectionMode = .semantic
@@ -923,6 +926,9 @@ class ViewController: UIViewController {
         pendingTurnLatencyMetrics.removeAll()
         chatSessionView.tableView.reloadData()
         isMicMuted = false
+        isAgentListening = false
+        isAgentThinking = false
+        isAgentSpeaking = false
         currentAgentState = .idle
         chatSessionView.updateStatusView(state: .idle)
         agentId = ""
@@ -934,6 +940,19 @@ class ViewController: UIViewController {
     // MARK: - UI Updates
     private func updateAgentStatusView() {
         chatSessionView.updateStatusView(state: currentAgentState)
+    }
+
+    private func updateAgentActivityState() {
+        if isAgentSpeaking {
+            currentAgentState = .speaking
+        } else if isAgentThinking {
+            currentAgentState = .thinking
+        } else if isAgentListening {
+            currentAgentState = .listening
+        } else {
+            currentAgentState = .silent
+        }
+        updateAgentStatusView()
     }
     
     // MARK: - Actions
@@ -1318,12 +1337,31 @@ extension ViewController: ConversationalAIAPIEventHandler {
             "Message receipt: type=\(chatMessageTypeValue(messageReceipt.messageType)), module=\(moduleTypeValue(messageReceipt.moduleType)), turn=\(messageReceipt.turnId)"
         )
     }
-    
+
     func onAgentStateChanged(agentUserId: String, event: StateChangeEvent) {
+    }
+
+    func onAgentListeningChanged(agentUserId: String, isListening: Bool) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.currentAgentState = event.state
-            self.updateAgentStatusView()
+            self.isAgentListening = isListening
+            self.updateAgentActivityState()
+        }
+    }
+
+    func onAgentThinkingChanged(agentUserId: String, isThinking: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.isAgentThinking = isThinking
+            self.updateAgentActivityState()
+        }
+    }
+
+    func onAgentSpeakingChanged(agentUserId: String, isSpeaking: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.isAgentSpeaking = isSpeaking
+            self.updateAgentActivityState()
         }
     }
     

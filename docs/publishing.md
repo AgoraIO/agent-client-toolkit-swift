@@ -26,7 +26,8 @@ Every release must update `CHANGELOG.md`.
 - Minor releases may add optional APIs, optional event fields, new callbacks with optional/default behavior, or new supported protocol events.
 - Major releases are required for source or binary incompatible public API changes, changed defaults, changed callback timing, changed package identity, or higher minimum platform baselines that exclude existing consumers.
 
-Release candidates must include changelog entries. Do not promote an RC to final until package validation and sample or clean-app validation pass.
+Publish only formal SemVer versions. Complete the required package and sample or
+clean-app validation before publication.
 
 ## Package the Rehoboam CocoaPods Input Zip
 
@@ -39,7 +40,7 @@ pod install
 Run:
 
 ```bash
-VERSION=2.9.0-rc.1 scripts/build_rehoboam_cocoapods_input_zip.sh
+VERSION=2.9.0 scripts/build_rehoboam_cocoapods_input_zip.sh
 ```
 
 The generated zip is written under:
@@ -66,7 +67,7 @@ prefilled binary URL; the staged podspec otherwise keeps the
 SwiftPM is also published through Rehoboam. The maintainer-facing command is:
 
 ```bash
-VERSION=2.9.0-rc.1 scripts/build_rehoboam_swiftpm_input_zip.sh
+VERSION=2.9.0 scripts/build_rehoboam_swiftpm_input_zip.sh
 ```
 
 The script prints the generated Rehoboam upload file:
@@ -157,7 +158,7 @@ AgoraAgentClientToolkit.xcframework/Info.plist
 1. `CHANGELOG.md` has a release entry for the version being packaged. The first public release must establish the compatibility baseline.
 2. Public API changes in `AgoraAgentClientToolkit/AgoraAgentClientToolkit/Classes/ConversationalAIAPI.swift` and `ConversationalAIAPIImpl.swift` have been reviewed for SemVer impact.
 3. Public README files are aligned with the API surface and contain only developer-facing installation and usage instructions.
-4. The release version is a non-SNAPSHOT version, for example `2.9.0-rc.1` or `2.9.0`.
+4. The release version is a formal SemVer version, for example `2.9.0`.
 5. The same version is used for both CocoaPods and SwiftPM Rehoboam input packages when they are released together.
 6. The staged CocoaPods podspec inside the generated zip has the expected `s.version`.
 7. The CocoaPods zip includes `agent-client-toolkit-swift.podspec` and `AgoraAgentClientToolkit.xcframework`.
