@@ -1,0 +1,27 @@
+Pod::Spec.new do |s|
+  s.name = 'agent-client-toolkit-swift'
+  s.module_name = 'AgoraAgentClientToolkit'
+  s.version = '2.9.0'
+  s.summary = 'Client-side toolkit for Agora Conversational AI on iOS.'
+  s.description = <<-DESC
+    A lightweight iOS toolkit that adds Conversational AI messaging,
+    transcript, state, interrupt, and metrics handling on top of
+    host-managed Agora RTC and RTM engine instances.
+  DESC
+
+  s.homepage = 'https://www.agora.io'
+  s.license = { :type => 'MIT' }
+  s.author = { 'Agora' => 'developer@agora.io' }
+  s.source = { :http => 'REPLACE_WITH_BINARY_ZIP_URL' }
+
+  s.platform = :ios, '15.0'
+  s.swift_version = '5.0'
+  s.static_framework = true
+  s.requires_arc = true
+  s.xcconfig = { 'ENABLE_BITCODE' => 'NO' }
+
+  s.vendored_frameworks = 'sdk/AgoraAgentClientToolkit.xcframework'
+
+  s.dependency 'AgoraRtcEngine_iOS', '>= 4.5.1'
+  s.dependency 'AgoraRtm/RtmKit', '>= 2.2.3'
+end

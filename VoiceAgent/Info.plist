@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>APP_CERTIFICATE</key>
+	<string>$(APP_CERTIFICATE)</string>
+	<key>APP_ID</key>
+	<string>$(APP_ID)</string>
+	<key>LLM_API_KEY</key>
+	<string>$(LLM_API_KEY)</string>
+	<key>LLM_MODEL</key>
+	<string>$(LLM_MODEL)</string>
+	<key>LLM_URL</key>
+	<string>$(LLM_URL)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>TTS_KEY</key>
+	<string>$(TTS_KEY)</string>
+	<key>TTS_MODEL_ID</key>
+	<string>$(TTS_MODEL_ID)</string>
+	<key>TTS_SAMPLE_RATE</key>
+	<string>$(TTS_SAMPLE_RATE)</string>
+	<key>TTS_VENDOR</key>
+	<string>$(TTS_VENDOR)</string>
+	<key>TTS_VOICE_ID</key>
+	<string>$(TTS_VOICE_ID)</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+</dict>
+</plist>

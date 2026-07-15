@@ -1,0 +1,15 @@
+# Rehoboam SwiftPM release template.
+# The platform injects sdk/**/.xcframework artifacts before this build runs.
+
+steps:
+  - name: prepare-dist
+    run: |
+      set -euo pipefail
+      rm -rf dist
+      mkdir -p dist
+      cp sdk/AgoraAgentClientToolkit/Package.swift dist/Package.swift
+      cp -R sdk/AgoraAgentClientToolkit/Sources dist/Sources
+
+  - name: package-xcframeworks
+    foreach: ./sdk/**/*.xcframework
+    run: zip --src {src[name]} --working-directory {src[parent]} --dest {env[cwd]}/dist/{src[stem]}.zip
