@@ -32,6 +32,10 @@ same LAN.
 Allow incoming Python connections if macOS asks. Do not use `localhost` on a
 physical iPhone because it points back to the phone.
 
+Successful `/get_config` responses use `Cache-Control: no-store`. The backend
+sets the Agora SDK request timeout to 25 seconds, below the iOS client's
+30-second timeout.
+
 ## Test
 
 ```bash

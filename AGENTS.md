@@ -67,6 +67,7 @@ messages, manual SOS/EOS, mute, and stop.
   bodies.
 - Propagates transport failures with the attempted backend URL.
 - Extracts safe backend `msg`, `reason`, or `detail` values on non-2xx responses.
+- Uses an ephemeral session and bypasses `URLCache` for `/get_config`.
 - Keeps Debug cURL output redacted.
 - Must not log response tokens or full secret-bearing payloads.
 
@@ -77,6 +78,9 @@ messages, manual SOS/EOS, mute, and stop.
   `AsyncAgora` client, builds the Fengming/OpenAI/MiniMax Agent, and
   tracks active `AsyncAgentSession` values by `agentId`.
 - User config contains a combined RTC + RTM token generated on the server.
+- Successful `/get_config` responses use `Cache-Control: no-store`.
+- `AsyncAgora` requests time out after 25 seconds, before the iOS client's
+  30-second timeout.
 - Agent start uses numeric string UIDs, `enable_string_uid: false`, an idle
   timeout of 120, RTM data channel, metrics/errors, SAL disabled, and RTM enabled.
 - Shared numeric UIDs stay within `1...2_147_483_647` so the backend contract is
@@ -249,4 +253,3 @@ Use the same explicit `VERSION` for CocoaPods and SwiftPM when they are released
 | `AGENTS.md` | Development rules and project constraints |
 | `ARCHITECTURE.md` | Runtime ownership and lifecycle |
 | `README.md` | Package integration and demo quick start |
-| `docs/voiceagent-python-backend-migration.md` | Migration contract and acceptance checklist |

@@ -107,7 +107,11 @@ targets: [
 ]
 ```
 
-## Requirements
+## Toolkit Requirements
+
+These requirements apply when integrating `AgoraAgentClientToolkit` into another
+app. The bundled VoiceAgent demo uses the newer project format and requires
+Xcode 16.0 or later, as listed above.
 
 - iOS 15.0 or later
 - Xcode 14.0 or later

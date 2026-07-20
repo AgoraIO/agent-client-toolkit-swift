@@ -60,6 +60,9 @@ The iOS bundle contains only `AGENT_BACKEND_URL`. It does not contain an App
 Certificate, provider keys, local signing code, an agent token, or a REST auth
 token.
 
+`GET /get_config` bypasses `URLCache` through an ephemeral `URLSession`. The
+backend also marks successful token responses with `Cache-Control: no-store`.
+
 ### Python Backend
 
 - Agora App ID and App Certificate
@@ -97,6 +100,10 @@ Tap Start
 `SessionStartupState` remains intentionally small. Agent start is permitted
 only while connecting and after RTC join, RTM login, and Toolkit subscription
 are all complete.
+
+The backend configures `AsyncAgora` with a 25-second request timeout, below the
+iOS client's 30-second timeout. The backend must return success or failure
+before iOS tears down a startup attempt without an `agentId`.
 
 Turn detection remains independent:
 
