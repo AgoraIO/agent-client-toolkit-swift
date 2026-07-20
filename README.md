@@ -2,6 +2,66 @@
 
 A client-side toolkit for adding Agora Conversational AI features to iOS applications already using the Agora RTC and RTM SDKs. It runs alongside your existing RTC/RTM integration and adds transcript rendering, agent state tracking, messaging controls, interrupt handling, and latency/error callbacks.
 
+## Run the VoiceAgent Demo
+
+The included UIKit demo uses a local Python FastAPI backend powered by
+[`agora-agents`](https://github.com/AgoraIO/agora-agents-python). A physical
+iPhone is the primary development path because it provides a representative
+microphone, speaker, echo cancellation, and network experience.
+
+Prerequisites:
+
+- Python 3.10 or later
+- Xcode 16.0 or later for the included VoiceAgent demo
+- CocoaPods
+- a Mac and physical iPhone running iOS 15.0 or later on the same LAN
+- an Agora project with RTC, RTM, and Conversational AI enabled
+
+Install the iOS demo dependencies from the repository root:
+
+```bash
+pod install
+```
+
+Configure the backend:
+
+```bash
+cp server/.env.example server/.env.local
+```
+
+Set `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE` from your Agora project in
+`server/.env.local`, then run from the repository root:
+
+```bash
+./scripts/start_backend.sh
+```
+
+On first use, the script creates `server/.venv` and installs the pinned Python
+dependencies. It starts FastAPI on `0.0.0.0:8001` by default, detects the Mac's
+active LAN IP, waits for `/health`, and writes only the backend address to the
+Git-ignored `Config/VoiceAgent-Local.xcconfig`.
+
+Set `PORT` in `server/.env.local` or before the command to use another free
+port. The script checks the selected port before startup and reports a clear
+error instead of overwriting the iOS backend configuration.
+
+Allow incoming Python connections if macOS asks. Then open
+`VoiceAgent.xcworkspace`, select your development team and connected iPhone,
+and run the `VoiceAgent` scheme.
+
+Do not use `localhost` for a physical iPhone because it resolves to the phone
+rather than the Mac. Only Debug builds allow development HTTP for this local
+LAN workflow; Release builds keep the arbitrary-load exception disabled.
+
+The demo explicitly uses Agora Fengming STT with managed OpenAI LLM and MiniMax
+TTS, so the default path does not require third-party provider keys. The iOS app contains
+no App Certificate or provider credentials. The backend generates the user
+RTC + RTM token and starts or stops the agent with the pinned
+`agora-agents==2.4.1` SDK. This repository does not provide a hosted backend,
+shared account, TestFlight build, or maintained prebuilt app. See
+[ARCHITECTURE.md](./ARCHITECTURE.md) for the runtime sequence and ownership
+boundaries.
+
 ## Install
 
 Choose one package manager to integrate `AgoraAgentClientToolkit`. Do not integrate the same component through CocoaPods and Swift Package Manager at the same time.
@@ -47,7 +107,11 @@ targets: [
 ]
 ```
 
-## Requirements
+## Toolkit Requirements
+
+These requirements apply when integrating `AgoraAgentClientToolkit` into another
+app. The bundled VoiceAgent demo uses the newer project format and requires
+Xcode 16.0 or later, as listed above.
 
 - iOS 15.0 or later
 - Xcode 14.0 or later
@@ -154,6 +218,17 @@ The server processing results are delivered through `onUserManualSosEvent` and
 `onUserManualEosEvent`. The toolkit only sends the RTM marker and returns the
 generated `requestId`; the host app still owns the agent start request and the
 choice of SOS / EOS detection mode.
+
+## Verification
+
+Run the focused backend and Swift checks from the repository root:
+
+```bash
+server/.venv/bin/python -m pytest server/tests -q
+./scripts/test_swift.sh
+```
+
+These automated checks do not replace physical-device voice validation.
 
 ## Release Notes
 

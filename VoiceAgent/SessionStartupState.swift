@@ -11,13 +11,14 @@ struct SessionStartupState {
     private(set) var phase: Phase = .idle
     private(set) var rtcJoined = false
     private(set) var rtmLoggedIn = false
+    private(set) var messageSubscribed = false
 
     var canStartConnection: Bool {
         phase == .idle
     }
 
     var shouldStartAgent: Bool {
-        phase == .connecting && rtcJoined && rtmLoggedIn
+        phase == .connecting && rtcJoined && rtmLoggedIn && messageSubscribed
     }
 
     mutating func beginPermissionRequest() -> Bool {
@@ -27,6 +28,7 @@ struct SessionStartupState {
         phase = .awaitingPermission
         rtcJoined = false
         rtmLoggedIn = false
+        messageSubscribed = false
         return true
     }
 
@@ -34,6 +36,7 @@ struct SessionStartupState {
         phase = .connecting
         rtcJoined = false
         rtmLoggedIn = false
+        messageSubscribed = false
     }
 
     mutating func markRTCJoined() {
@@ -44,6 +47,10 @@ struct SessionStartupState {
         rtmLoggedIn = true
     }
 
+    mutating func markMessageSubscribed() {
+        messageSubscribed = true
+    }
+
     mutating func markConnected() {
         phase = .connected
     }
@@ -52,5 +59,6 @@ struct SessionStartupState {
         phase = .idle
         rtcJoined = false
         rtmLoggedIn = false
+        messageSubscribed = false
     }
 }

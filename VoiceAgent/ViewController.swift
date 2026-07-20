@@ -219,8 +219,7 @@ private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
 }
 
 class ViewController: UIViewController {
-    private static let defaultLLMGreetingMessage = "hello man, I am an AI robot, I can do anything for you"
-    private static let defaultLLMFailureMessage = "Sorry, I don't know how to answer your question"
+    private static let requestedUid = Int.random(in: 1000...9_999_999)
 
     // MARK: - UI Components
     private let backgroundGradientLayer = CAGradientLayer()
@@ -234,7 +233,7 @@ class ViewController: UIViewController {
     private let debugInfoTextView = UITextView()
     
     // MARK: - State
-    private let uid = Int.random(in: 1000...9999999)
+    private var uid = 0
     private var channel: String = ""
     private var transcriptItems: [TranscriptItem] = []
     private var pendingTurnLatencyMetrics: [Int: TurnLatencyMetrics] = [:]
@@ -253,13 +252,12 @@ class ViewController: UIViewController {
     
     // MARK: - Agora Components
     private var token: String = ""
-    private var agentToken: String = ""
-    private var authToken: String = ""
     private var agentId: String = ""
+    private var agentUid = 0
+    private var agentManager: AgentManager?
     private var rtcEngine: AgoraRtcEngineKit?
     private var rtmEngine: AgoraRtmClientKit?
     private var convoAIAPI: ConversationalAIAPI?
-    private let agentUid = Int.random(in: 10000000...99999999)
     
     // MARK: - Toast
     private var loadingToast: UIView?
@@ -372,26 +370,27 @@ class ViewController: UIViewController {
         navigationController?.setNavigationBarHidden(true, animated: false)
         setupUI()
         setupConstraints()
-        initializeEnginesIfNeeded()
     }
 
     private func validateConfiguration() -> Bool {
         let missingKeys = KeyCenter.missingRequiredKeys
         guard missingKeys.isEmpty else {
-            let message = "Missing Agora configuration: \(missingKeys.joined(separator: ", "))"
+            let message = "Missing backend configuration: \(missingKeys.joined(separator: ", "))"
             addDebugMessage(message)
             connectionStartView.update(for: .ready)
             showErrorToast(message)
             return false
         }
 
-        return true
-    }
-
-    private func initializeEnginesIfNeeded() {
-        guard rtcEngine == nil || rtmEngine == nil || convoAIAPI == nil else { return }
-        guard validateConfiguration() else { return }
-        initializeEngines()
+        do {
+            _ = try AgentManager(baseURLString: KeyCenter.AGENT_BACKEND_URL)
+            return true
+        } catch {
+            addDebugMessage(error.localizedDescription)
+            connectionStartView.update(for: .ready)
+            showErrorToast(error.localizedDescription)
+            return false
+        }
     }
     
     // MARK: - UI Setup
@@ -529,14 +528,28 @@ class ViewController: UIViewController {
     }
     
     // MARK: - Engine Initialization
-    private func initializeEngines() {
-        initializeRTM()
-        initializeRTC()
-        initializeConvoAIAPI()
+    @MainActor
+    private func initializeEngines(appId: String, userUid: Int) throws {
+        guard rtcEngine == nil, rtmEngine == nil, convoAIAPI == nil else {
+            throw NSError(
+                domain: "initializeEngines",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Agora engines are already initialized"]
+            )
+        }
+
+        do {
+            try initializeRTM(appId: appId, userUid: userUid)
+            initializeRTC(appId: appId)
+            try initializeConvoAIAPI()
+        } catch {
+            releaseAgoraResources(unsubscribeChannel: "")
+            throw error
+        }
     }
     
-    private func initializeRTM() {
-        let rtmConfig = AgoraRtmClientConfig(appId: KeyCenter.APP_ID, userId: "\(uid)")
+    private func initializeRTM(appId: String, userUid: Int) throws {
+        let rtmConfig = AgoraRtmClientConfig(appId: appId, userId: "\(userUid)")
         rtmConfig.areaCode = [.CN, .NA]
         rtmConfig.presenceTimeout = 30
         rtmConfig.heartbeatInterval = 10
@@ -547,13 +560,14 @@ class ViewController: UIViewController {
             self.rtmEngine = rtmClient
             addDebugMessage("RtmClient init successfully")
         } catch {
-            addDebugMessage("RtmClient init failed")
+            addDebugMessage("RtmClient init failed: \(error.localizedDescription)")
+            throw error
         }
     }
     
-    private func initializeRTC() {
+    private func initializeRTC(appId: String) {
         let rtcConfig = AgoraRtcEngineConfig()
-        rtcConfig.appId = KeyCenter.APP_ID
+        rtcConfig.appId = appId
         rtcConfig.channelProfile = .liveBroadcasting
         rtcConfig.audioScenario = .aiClient
         let rtcEngine = AgoraRtcEngineKit.sharedEngine(with: rtcConfig, delegate: self)
@@ -565,15 +579,21 @@ class ViewController: UIViewController {
         addDebugMessage("RtcEngine init successfully")
     }
     
-    private func initializeConvoAIAPI() {
+    private func initializeConvoAIAPI() throws {
         guard let rtcEngine = self.rtcEngine else {
-            print("[VoiceAgent] ConvoAI API initialization failed: RTC engine is not initialized")
-            return
+            throw NSError(
+                domain: "initializeConvoAIAPI",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "RTC engine is not initialized"]
+            )
         }
         
         guard let rtmEngine = self.rtmEngine else {
-            print("[VoiceAgent] ConvoAI API initialization failed: RTM engine is not initialized")
-            return
+            throw NSError(
+                domain: "initializeConvoAIAPI",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "RTM engine is not initialized"]
+            )
         }
         
         let config = ConversationalAIAPIConfig(rtcEngine: rtcEngine, rtmEngine: rtmEngine, renderMode: .words, enableLog: false)
@@ -585,69 +605,86 @@ class ViewController: UIViewController {
     }
     
     // MARK: - Connection Flow
-    private func startConnection() {
+    private func startConnection(requestedChannel: String, requestedUid: Int) {
         startupState.beginConnecting()
         connectionStartView.update(for: .connecting)
         refreshTurnDetectionUI()
         showLoadingToast()
         
-        Task {
+        Task { @MainActor in
             do {
-                // 1. Generate the user token
-                try await generateUserToken()
-                
-                // 2. Log in to RTM
+                // 1. Fetch the user RTC/RTM configuration from the local backend.
+                let agentManager = try AgentManager(baseURLString: KeyCenter.AGENT_BACKEND_URL)
+                self.agentManager = agentManager
+                let config = try await agentManager.getConfiguration(
+                    channel: requestedChannel,
+                    uid: requestedUid
+                )
+                guard let resolvedUid = Int(config.uid), resolvedUid > 0,
+                      let resolvedAgentUid = Int(config.agentUid), resolvedAgentUid > 0,
+                      !config.appId.isEmpty,
+                      !config.token.isEmpty,
+                      !config.channelName.isEmpty else {
+                    throw AgentManagerError.invalidData(
+                        message: "Backend returned invalid RTC/RTM configuration"
+                    )
+                }
+                channel = config.channelName
+                uid = resolvedUid
+                agentUid = resolvedAgentUid
+                token = config.token
+                addDebugMessage("Backend configuration received successfully")
+
+                // 2. Initialize RTC, RTM, and Toolkit with backend-owned config.
+                try initializeEngines(appId: config.appId, userUid: resolvedUid)
+                convoAIAPI?.loadAudioSettings()
+
+                // 3. Log in to RTM.
                 try await loginRTM()
                 
-                // 3. Join the RTC channel and wait for the real joined callback
+                // 4. Join RTC and wait for the real joined callback.
                 try await joinRTCChannel()
 
+                // 5. Subscribe to ConvoAI messages and require completion.
+                try await subscribeConvoAIMessage()
+
                 guard startupState.shouldStartAgent else {
-                    throw NSError(domain: "startConnection", code: -1, userInfo: [NSLocalizedDescriptionKey: "RTC or RTM is not ready"])
+                    throw NSError(
+                        domain: "startConnection",
+                        code: -1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "RTC, RTM, or message subscription is not ready"
+                        ]
+                    )
                 }
 
-                // 4. Subscribe to ConvoAI messages
-                try await subscribeConvoAIMessage()
-                
-                // 5. Generate the agent token
-                try await generateAgentToken()
-
-                // 6. Generate the REST auth token
-                try await generateAuthToken()
-
-                // 7. Start the agent
+                // 6. Start the agent through the local Python backend.
                 try await startAgent()
                 
-                await MainActor.run {
-                    startupState.markConnected()
-                    hideLoadingToast()
-                    switchToChatView()
-                }
+                startupState.markConnected()
+                hideLoadingToast()
+                switchToChatView()
             } catch {
-                await MainActor.run {
-                    cleanupAfterConnectionFailure()
-                    startupState.reset()
-                    refreshTurnDetectionUI()
-                    hideLoadingToast()
-                    connectionStartView.update(for: .ready)
-                    showErrorToast(error.localizedDescription)
-                }
+                addDebugMessage("Connection failed: \(error.localizedDescription)")
+                cleanupAfterConnectionFailure()
+                startupState.reset()
+                refreshTurnDetectionUI()
+                hideLoadingToast()
+                connectionStartView.update(for: .ready)
+                showErrorToast(error.localizedDescription)
             }
         }
     }
 
     @MainActor
     private func cleanupAfterConnectionFailure() {
-        rtcJoinContinuation?.resume(throwing: NSError(domain: "joinRTCChannel", code: -999, userInfo: [NSLocalizedDescriptionKey: "RTC join cancelled"]))
-        rtcJoinContinuation = nil
-        joiningChannel = nil
-        rtcEngine?.leaveChannel()
-        convoAIAPI?.unsubscribeMessage(channelName: channel) { _ in }
-        rtmEngine?.logout { _, _ in }
+        releaseAgoraResources(unsubscribeChannel: channel)
         agentId = ""
         token = ""
-        agentToken = ""
-        authToken = ""
+        agentUid = 0
+        uid = 0
+        channel = ""
+        agentManager = nil
     }
 
     @MainActor
@@ -674,64 +711,6 @@ class ViewController: UIViewController {
             return false
         }
     }
-    
-    // MARK: - Token Generation
-    private func generateUserToken() async throws {
-        token = try await generateToken(
-            uid: "\(uid)",
-            failureLog: "Generate user token failed",
-            errorDomain: "generateUserToken",
-            errorMessage: "Failed to get user token. Please try again."
-        )
-        addDebugMessage("Generate user token successfully")
-    }
-    
-    private func generateAgentToken() async throws {
-        agentToken = try await generateToken(
-            uid: "\(agentUid)",
-            failureLog: "Generate agent token failed",
-            errorDomain: "generateAgentToken",
-            errorMessage: "Failed to get agent token. Please try again."
-        )
-        addDebugMessage("Generate agent token successfully")
-    }
-
-    private func generateAuthToken() async throws {
-        authToken = try await generateToken(
-            uid: "\(agentUid)",
-            failureLog: "Generate auth token failed",
-            errorDomain: "generateAuthToken",
-            errorMessage: "Failed to get auth token. Please try again."
-        )
-        addDebugMessage("Generate auth token successfully")
-    }
-
-    private func generateToken(
-        uid: String,
-        failureLog: String,
-        errorDomain: String,
-        errorMessage: String
-    ) async throws -> String {
-        let tokenResult = await TokenGenerator.generateTokensAsync(
-            channelName: channel,
-            uid: uid
-        )
-
-        switch tokenResult {
-        case .success(let token):
-            return token
-        case .failure(let error):
-            addDebugMessage(failureLog)
-            throw NSError(
-                domain: errorDomain,
-                code: -1,
-                userInfo: [
-                    NSLocalizedDescriptionKey: "\(errorMessage) \(error.localizedDescription)"
-                ]
-            )
-        }
-    }
-    
     // MARK: - Channel Connection
     @MainActor
     private func loginRTM() async throws {
@@ -741,27 +720,32 @@ class ViewController: UIViewController {
 
         return try await withCheckedThrowingContinuation { continuation in
             let loginToken = self.token
-            let performLogin = { [self] in
-                rtmEngine.login(loginToken) { res, error in
-                    if let error = error {
-                        self.addDebugMessage("Rtm login failed, code: \(error.code)")
-                        continuation.resume(throwing: NSError(domain: "loginRTM", code: -1, userInfo: [NSLocalizedDescriptionKey: "RTM login failed: \(error.localizedDescription)"]))
-                    } else if let _ = res {
-                        self.addDebugMessage("Rtm login successful")
-                        self.startupState.markRTMLoggedIn()
-                        continuation.resume()
-                    } else {
-                        self.addDebugMessage("Rtm login failed, code: -1")
-                        continuation.resume(throwing: NSError(domain: "loginRTM", code: -1, userInfo: [NSLocalizedDescriptionKey: "RTM login failed"]))
-                    }
+            rtmEngine.login(loginToken) { res, error in
+                if let error = error {
+                    self.addDebugMessage("Rtm login failed, code: \(error.code)")
+                    continuation.resume(
+                        throwing: NSError(
+                            domain: "loginRTM",
+                            code: error.code,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: "RTM login failed: \(error.localizedDescription)"
+                            ]
+                        )
+                    )
+                } else if let _ = res {
+                    self.addDebugMessage("Rtm login successful")
+                    self.startupState.markRTMLoggedIn()
+                    continuation.resume()
+                } else {
+                    self.addDebugMessage("Rtm login failed, code: -1")
+                    continuation.resume(
+                        throwing: NSError(
+                            domain: "loginRTM",
+                            code: -1,
+                            userInfo: [NSLocalizedDescriptionKey: "RTM login failed"]
+                        )
+                    )
                 }
-            }
-
-            rtmEngine.logout { _, error in
-                if let reason = error?.reason, !reason.isEmpty {
-                    print("[VoiceAgent] RTM pre-login logout: \(reason)")
-                }
-                performLogin()
             }
         }
     }
@@ -807,6 +791,7 @@ class ViewController: UIViewController {
                     continuation.resume(throwing: NSError(domain: "subscribeConvoAIMessage", code: -1, userInfo: [NSLocalizedDescriptionKey: "ConvoAI subscription failed: \(error.message)"]))
                 } else {
                     print("[VoiceAgent] ConvoAI subscribed")
+                    self.startupState.markMessageSubscribed()
                     continuation.resume()
                 }
             }
@@ -814,77 +799,22 @@ class ViewController: UIViewController {
     }
     
     // MARK: - Agent Management
-    private func turnDetectionConfig(for mode: TurnDetectionMode) -> [String: Any] {
-        [
-            "mode": mode.rawValue
-        ]
-    }
-
     private func startAgent() async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            let parameter: [String: Any] = [
-                "name": channel,
-                "properties": [
-                    "channel": channel,
-                    "token": agentToken,
-                    "agent_rtc_uid": "\(agentUid)",
-                    "remote_rtc_uids": ["\(uid)"],
-                    "enable_string_uid": false,
-                    "idle_timeout": 120,
-                    "advanced_features": [
-                        "enable_sal": false,
-                        "enable_rtm": true
-                    ],
-                    "tts": [
-                        "vendor": KeyCenter.TTS_VENDOR,
-                        "params": [
-                            "key": KeyCenter.TTS_KEY,
-                            "model_id": KeyCenter.TTS_MODEL_ID,
-                            "voice_id": KeyCenter.TTS_VOICE_ID,
-                            "sample_rate": KeyCenter.TTS_SAMPLE_RATE
-                        ]
-                    ],
-                    "llm": [
-                        "url": KeyCenter.LLM_URL,
-                        "api_key": KeyCenter.LLM_API_KEY,
-                        "params": [
-                            "model": KeyCenter.LLM_MODEL
-                        ],
-                        "greeting_message": Self.defaultLLMGreetingMessage,
-                        "failure_message": Self.defaultLLMFailureMessage
-                    ],
-                    "parameters": [
-                        "enable_metrics": true,
-                        "enable_error_message": true,
-                        "data_channel": "rtm"
-                    ],
-                    "turn_detection": [
-                        "mode": "default",
-                        "config": [
-                            "start_of_speech": turnDetectionConfig(for: sosDetectionMode),
-                            "end_of_speech": turnDetectionConfig(for: eosDetectionMode)
-                        ]
-                    ]
-                ] as [String: Any]
-            ]
-            AgentManager.startAgent(parameter: parameter, token: self.authToken) { agentId, error in
-                if let error = error {
-                    self.addDebugMessage("Agent start failed")
-                    continuation.resume(throwing: NSError(domain: "startAgent", code: -1, userInfo: [NSLocalizedDescriptionKey: error.localizedDescription]))
-                    return
-                }
-                
-                if let agentId = agentId {
-                    self.agentId = agentId
-                    self.addDebugMessage("Agent start successfully")
-                    print("[VoiceAgent] Agent started successfully, agentId: \(agentId)")
-                    continuation.resume()
-                } else {
-                    self.addDebugMessage("Agent start failed")
-                    continuation.resume(throwing: NSError(domain: "startAgent", code: -1, userInfo: [NSLocalizedDescriptionKey: "Agent start failed: missing agentId"]))
-                }
-            }
+        guard let agentManager else {
+            throw AgentManagerError.invalidData(message: "Backend client is not initialized")
         }
+        let result = try await agentManager.startAgent(
+            StartAgentRequest(
+                channelName: channel,
+                agentUid: agentUid,
+                userUid: uid,
+                startOfSpeechMode: sosDetectionMode.rawValue,
+                endOfSpeechMode: eosDetectionMode.rawValue
+            )
+        )
+        agentId = result.agentId
+        addDebugMessage("Agent start successfully")
+        print("[VoiceAgent] Agent started successfully, agentId: \(result.agentId)")
     }
     
     // MARK: - View Management
@@ -900,22 +830,52 @@ class ViewController: UIViewController {
         chatSessionView.setControlsVisible(false)
         refreshTurnDetectionUI()
     }
-    
-    private func resetConnectionState() {
-        rtcJoinContinuation?.resume(throwing: NSError(domain: "joinRTCChannel", code: -999, userInfo: [NSLocalizedDescriptionKey: "RTC join cancelled"]))
+
+    @MainActor
+    private func releaseAgoraResources(unsubscribeChannel: String) {
+        let convoAIAPIToRelease = convoAIAPI
+        let rtcEngineToRelease = rtcEngine
+        let rtmEngineToRelease = rtmEngine
+        convoAIAPI = nil
+        rtcEngine = nil
+        rtmEngine = nil
+
+        rtcJoinContinuation?.resume(
+            throwing: NSError(
+                domain: "joinRTCChannel",
+                code: -999,
+                userInfo: [NSLocalizedDescriptionKey: "RTC join cancelled"]
+            )
+        )
         rtcJoinContinuation = nil
-        rtcEngine?.leaveChannel()
-        rtmEngine?.logout { _, errorInfo in
-            if let reason = errorInfo?.reason, !reason.isEmpty {
-                print("[VoiceAgent] RTM logout failed: \(reason)")
+        joiningChannel = nil
+
+        if !unsubscribeChannel.isEmpty {
+            convoAIAPIToRelease?.unsubscribeMessage(channelName: unsubscribeChannel) { error in
+                if let error {
+                    print("[VoiceAgent] ConvoAI unsubscribe failed: \(error.message)")
+                }
             }
         }
-        convoAIAPI?.unsubscribeMessage(channelName: channel, completion: { error in
-            if let error = error {
-                print("[VoiceAgent] ConvoAI unsubscribe failed: \(error.message)")
+        rtcEngineToRelease?.leaveChannel()
+        convoAIAPIToRelease?.removeHandler(handler: self)
+        convoAIAPIToRelease?.destroy()
+
+        if let rtmEngineToRelease {
+            rtmEngineToRelease.logout(nil)
+            let destroyResult = rtmEngineToRelease.destroy()
+            if destroyResult.rawValue != 0 {
+                print("[VoiceAgent] RTM destroy failed, code: \(destroyResult.rawValue)")
             }
-        })
-        joiningChannel = nil
+        }
+
+        if rtcEngineToRelease != nil {
+            AgoraRtcEngineKit.destroy()
+        }
+    }
+
+    private func resetConnectionState() {
+        releaseAgoraResources(unsubscribeChannel: channel)
         
         switchToConfigView()
         startupState.reset()
@@ -933,8 +893,10 @@ class ViewController: UIViewController {
         chatSessionView.updateStatusView(state: .idle)
         agentId = ""
         token = ""
-        agentToken = ""
-        authToken = ""
+        agentUid = 0
+        uid = 0
+        channel = ""
+        agentManager = nil
     }
     
     // MARK: - UI Updates
@@ -995,7 +957,6 @@ class ViewController: UIViewController {
 
     @objc private func startButtonTapped() {
         guard validateConfiguration() else { return }
-        initializeEnginesIfNeeded()
 
         guard startupState.beginPermissionRequest() else {
             addDebugMessage("Start ignored: session is already connecting")
@@ -1012,8 +973,8 @@ class ViewController: UIViewController {
                 return
             }
 
-            self.channel = "channel_swift_\(Int.random(in: 100000...999999))"
-            startConnection()
+            let requestedChannel = "channel_swift_\(Int.random(in: 100000...999999))"
+            startConnection(requestedChannel: requestedChannel, requestedUid: Self.requestedUid)
         }
     }
     
@@ -1178,10 +1139,14 @@ class ViewController: UIViewController {
     
     @objc private func endCall() {
         let activeAgentId = agentId
-        if !activeAgentId.isEmpty {
-            AgentManager.stopAgent(agentId: activeAgentId, token: authToken) { [weak self] error in
-                if error == nil {
+        let activeAgentManager = agentManager
+        if !activeAgentId.isEmpty, let activeAgentManager {
+            Task { [weak self] in
+                do {
+                    try await activeAgentManager.stopAgent(agentId: activeAgentId)
                     self?.addDebugMessage("Agent stopped successfully")
+                } catch {
+                    self?.addDebugMessage("Agent stop failed: \(error.localizedDescription)")
                 }
             }
         }

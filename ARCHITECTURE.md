@@ -1,222 +1,169 @@
-# Architecture — Conversational AI Quickstart iOS Swift
+# Architecture - Conversational AI Quickstart iOS Swift
 
-## Architecture Overview
+## Overview
 
-This quickstart is a single-screen voice conversation demo built with UIKit and programmatic views.
+The quickstart is a single-screen UIKit voice client plus a local Python
+backend. The iOS app owns RTC, RTM, Toolkit callbacks, UI, and immediate local
+cleanup. The backend owns credentials, token generation, provider settings,
+and the Conversational AI agent lifecycle through `agora-agents`.
 
-Current scope:
+```text
+iPhone VoiceAgent
+  -> local FastAPI backend -> agora-agents -> Agora Conversational AI
+  <-> Agora RTC / RTM
+  <-> AgoraAgentClientToolkit callbacks
+```
 
-- Start Agent
-- RTC join + RTM login
-- Startup-time selection for independent SOS / EOS turn detection
-- Real-time transcript rendering
-- Real-time latency display with a visibility toggle
-- Agent status rendering
-- Interrupt
-- Text message and image URL publishing
-- Manual SOS / EOS trigger buttons shown by selected detection modes
-- Mute / unmute
-- Stop Agent and cleanup
-
-Out of scope for this quickstart:
-
-- Multi-screen business flow
-- Backend-owned token / agent startup flow
-
-## Page Layout
-
-The page is intentionally single-screen and is organized into these regions:
-
-- debug log panel at the top
-- startup-time turn detection summary and settings button
-- start view before connection
-- transcript list and latency toggle after connection
-- capability panel for manual SOS / EOS actions when enabled
-- agent status view
-- mute / chat / stop controls
-- bottom input panel for connected-only text and image URL messages
+The primary development path is a physical iPhone and Mac on the same LAN.
+There is no hosted service, TestFlight build, or shared credential set.
 
 ## Project Structure
 
 ```text
-ios-swift/
-├── Podfile
-├── VoiceAgent/
-│   ├── AppDelegate.swift
-│   ├── SceneDelegate.swift
-│   ├── ViewController.swift
-│   ├── KeyCenter.swift
-│   ├── AppColors.swift
-│   ├── ManualTurnDemoUI.swift
-│   ├── TurnDetectionMode.swift
-│   ├── Chat/
-│   │   ├── ConnectionStartView.swift
-│   │   ├── ChatSessionView.swift
-│   │   ├── AgentStateView.swift
-│   │   └── TranscriptMessageCell.swift
-│   ├── Tools/
-│   │   ├── AgentManager.swift
-│   │   └── NetworkManager.swift
-│   ├── Dynamickey/
-│   │   ├── TokenGenerator.swift
-│   │   ├── RtcTokenBuilder2.swift
-│   │   └── AccessToken2.swift
-└── VoiceAgent.xcworkspace
-
-The demo consumes the local CocoaPods pod `agent-client-toolkit-swift` declared
-in `Podfile`, while Swift code imports the `AgoraAgentClientToolkit` module.
+agent-client-toolkit-swift/
+|- VoiceAgent/
+|  |- ViewController.swift
+|  |- KeyCenter.swift
+|  |- SessionStartupState.swift
+|  |- Chat/
+|  `- Tools/
+|     |- AgentManager.swift
+|     `- NetworkManager.swift
+|- server/
+|  |- src/
+|  |  |- agent.py
+|  |  `- server.py
+|  |- tests/
+|  |- .env.example
+|  `- requirements.txt
+|- scripts/
+|  |- start_backend.sh
+|  `- test_swift.sh
+`- VoiceAgent.xcworkspace
 ```
 
-## Runtime Shape
+The app consumes `AgoraAgentClientToolkit` through the local CocoaPods
+dependency. The sample does not copy or modify Toolkit source.
+
+## Ownership
+
+### iOS Client
+
+- microphone and local-network permissions
+- `GET /get_config`, `POST /startAgent`, and `POST /stopAgent`
+- RTC and RTM initialization from backend-returned App ID, UID, and user token
+- `ConversationalAIAPI` creation, subscription, callbacks, and destruction
+- transcript, latency, state, chat, interrupt, manual SOS/EOS, and mute UI
+- local teardown that does not wait for the backend stop response
+
+The iOS bundle contains only `AGENT_BACKEND_URL`. It does not contain an App
+Certificate, provider keys, local signing code, an agent token, or a REST auth
+token.
+
+`GET /get_config` bypasses `URLCache` through an ephemeral `URLSession`. The
+backend also marks successful token responses with `Cache-Control: no-store`.
+
+### Python Backend
+
+- Agora App ID and App Certificate
+- explicit Agora Fengming ASR, managed OpenAI `gpt-4o-mini`, and MiniMax
+  `speech_2_6_turbo` configuration
+- combined user RTC + RTM token generation
+- `agora-agents==2.4.1` client and session lifecycle
+- agent RTC credential and REST authentication generation inside the SDK
+- active `agentId` to `AsyncAgentSession` tracking
+- tracked stop plus stateless idempotent fallback
+
+The backend serializes ASR explicitly as `{"vendor":"fengming"}`. OpenAI and
+MiniMax constructors do not receive provider keys, and the SDK converts them to
+the managed preset
+`openai_gpt_4o_mini,minimax_speech_2_6_turbo`. Request-shape tests lock both
+forms and verify that third-party credential fields are absent.
+
+## Startup Sequence
 
 ```text
-ViewController /
-RTC / RTM / ConversationalAIAPI /
-TokenGenerator / NetworkManager / AgentManager
+Tap Start
+  -> request microphone permission
+  -> GET /get_config with a new channel and process-stable user UID
+  -> validate returned App ID, token, UIDs, and channel
+  -> initialize RTC and RTM
+  -> create Toolkit, register handler, loadAudioSettings()
+  -> RTM login
+  -> RTC join and wait for didJoinChannel
+  -> subscribeMessage and require successful completion
+  -> POST /startAgent with channel, UIDs, SOS mode, and EOS mode
+  -> require a non-empty agentId
+  -> show connected UI
 ```
 
-`ConversationalAIAPI` types are provided by the `AgoraAgentClientToolkit` Swift
-module, which parses RTM payloads and emits agent / transcript callbacks.
+`SessionStartupState` remains intentionally small. Agent start is permitted
+only while connecting and after RTC join, RTM login, and Toolkit subscription
+are all complete.
 
-## Connection Flow (User taps Start Agent)
+The backend configures `AsyncAgora` with a 25-second request timeout, below the
+iOS client's 30-second timeout. The backend must return success or failure
+before iOS tears down a startup attempt without an `agentId`.
+
+Turn detection remains independent:
+
+- SOS maps to `turn_detection.config.start_of_speech.mode`
+- EOS maps to `turn_detection.config.end_of_speech.mode`
+- both accept `vad`, `semantic`, or `manual`
+- the backend sends only each selected `mode`; it does not add `vad_config` or
+  `semantic_config`
+
+## Runtime Data Flow
 
 ```text
-Tap Start Agent
-  → generate channel
-  → generate user token
-  → login RTM
-  → join RTC
-  → subscribe RTM channel
-  → generate agentToken
-  → generate authToken
-  → POST /join with server default ASR, explicit LLM / TTS config, and selected `turn_detection`
-  → save agentId
-  → switch to chat view
+RTC audio + RTM events
+  -> AgoraAgentClientToolkit
+  -> ViewController callbacks
+  -> transcript / latency / state UI
 ```
 
-iOS Swift-specific conventions:
+Text messages, image URLs, interrupt, and manual SOS/EOS continue to use
+`ConversationalAIAPI`. Agent state and transcript data are never fabricated
+from the `/startAgent` HTTP response.
 
-- `uid` and `agentUid` are random integers and do not conflict
-- `channel` format is `channel_swift_<6-digit-random>`
-- REST auth header is `Authorization: agora token=<authToken>`
-
-## Transcript And Message Data Flow
+## Stop and Failure Cleanup
 
 ```text
-RTM message
-  → AgoraAgentClientToolkit
-  → ViewController.onTranscriptUpdated(...)
-  → transcriptItems update
-  → ChatSessionView table reload
+capture agentId and AgentManager
+  -> fire POST /stopAgent
+  -> unsubscribe Toolkit immediately
+  -> leave RTC
+  -> remove Toolkit handler and destroy Toolkit
+  -> log out and destroy RTM client
+  -> destroy RTC engine
+  -> clear session state and return to Start UI
 ```
 
-The current UI renders:
+Startup failures use the same resource release path. A delayed or failed
+backend stop is logged but cannot keep the UI connected.
 
-- agent transcript on the left
-- user transcript on the right
-- optional turn latency metrics on agent transcript rows
+## Configuration
 
-Chat message publishing:
+Backend secrets live only in `server/.env.local`, copied from
+`server/.env.example`. The file is ignored by Git.
+
+`scripts/start_backend.sh` starts FastAPI on `0.0.0.0:8001` by default, detects
+the Mac LAN IP, health-checks the service, and writes the ignored
+`Config/VoiceAgent-Local.xcconfig`:
 
 ```text
-Tap Chat
-  → ChatMessageInputPanelView
-  → ViewController.sendTextMessage(...) / sendImageUrlMessage(...)
-  → ConversationalAIAPI.chat(...)
-  → onMessageReceiptUpdated(...) / onMessageError(...)
-  → debug log update
+AGENT_BACKEND_URL = http://<mac-lan-ip>:8001
 ```
 
-## UI State Rendering
-
-```text
-startupState             → start button, loading toast, connected controls
-currentAgentState        → AgentStateView status
-transcriptItems          → transcript table content
-pending latency metrics  → real-time data labels on agent rows
-debugLogList             → top log panel
-isMicMuted               → mic button state
-sos/eos detection        → turn detection label + manual capability panel
-chat input visibility    → bottom text / image URL input panel
-```
-
-Turn detection is selected before startup. `SOS` controls
-`properties.turn_detection.config.start_of_speech.mode`; `EOS`
-controls `properties.turn_detection.config.end_of_speech.mode`. Both support
-`vad`, `semantic`, and `manual`. When a selected mode is `manual`, the matching
-SOS or EOS button appears after the connection is established.
-
-Manual button flow:
-
-```text
-Tap SOS / EOS
-  → ConversationalAIAPI.manualSOS(...) / manualEOS(...)
-  → RTM publish with custom type user.manual_sos / user.manual_eos
-  → server result event
-  → ViewController.onUserManualSosEvent(...) / onUserManualEosEvent(...)
-  → debug log update
-```
-
-## Token Flow
-
-The quickstart generates three token roles through `TokenGenerator`. In demo
-mode, `TokenGenerator` uses local AccessToken2 generation from
-`APP_CERTIFICATE`:
-
-| Token | Purpose | Usage |
-|-------|---------|-------|
-| `token` | User RTC join + RTM login | `joinChannel()` / `loginRTM()` |
-| `agentToken` | Agent RTC join credential | Request body `properties.token` |
-| `authToken` | REST API authentication | `Authorization: agora token=<authToken>` |
-
-Notes:
-
-- all three tokens are unified RTC + RTM tokens
-- `token` uses the current `channel` so RTC join and RTM login are bound to the session channel
-- `agentToken` and `authToken` are generated after RTC / RTM are both ready
-- production should replace demo-side token generation with a backend and must not embed `APP_CERTIFICATE`
-
-## Agent Lifecycle
-
-```text
-IDLE
-  → LISTENING
-  → THINKING
-  → SPEAKING
-  → LISTENING
-```
-
-Additional behavior:
-
-- `unknown` is the initial UI state before agent events arrive
-- tapping Stop unsubscribes RTM, stops the Agent, leaves RTC, logs out RTM, and resets UI state
-
-## Config Contract
-
-```text
-KeyCenter.swift
-  → ViewController / AgentManager / NetworkManager / TokenGenerator
-```
-
-Required fields:
-
-- `APP_ID`
-- `APP_CERTIFICATE`
-
-Local credentials should be stored in `VoiceAgent/Secrets.plist`, copied from
-`VoiceAgent/Secrets.example.plist`. The local secrets file is ignored by Git.
-CI or internal builds can inject the same values through Xcode build settings
-named `APP_ID` and `APP_CERTIFICATE`.
-
-Default demo LLM / TTS values are resolved by `KeyCenter.swift`:
-
-- ASR: server default; no client-side `properties.asr` override
-- LLM: `LLM_URL`, `LLM_API_KEY`, `LLM_MODEL`
-- TTS: `TTS_VENDOR`, `TTS_KEY`, `TTS_MODEL_ID`, `TTS_VOICE_ID`, `TTS_SAMPLE_RATE`
+The Debug target permits local HTTP. The Release target does not include the
+ATS development exception. Source plist configuration files are excluded from
+the target, so legacy local secrets are not copied into the app bundle.
 
 ## Constraints
 
-- This is a demo; token generation and agent startup are client-side for convenience
-- Production should move token generation and REST startup to a backend and must not embed `APP_CERTIFICATE`
-- `AgoraAgentClientToolkit` should be consumed through the
-  `agent-client-toolkit-swift` Pod dependency and not copied into `VoiceAgent/`
+- Use the Mac LAN IP for a physical iPhone; `localhost` points to the phone.
+- Keep the Mac and iPhone on the same LAN and allow incoming Python connections.
+- Real voice acceptance requires a physical device; Simulator builds are only
+  compilation and basic integration evidence.
+- Production must replace this local backend with an authenticated deployed
+  service and production token policy.
