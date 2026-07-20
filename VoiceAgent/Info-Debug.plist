@@ -4,6 +4,11 @@
 <dict>
 	<key>AGENT_BACKEND_URL</key>
 	<string>$(AGENT_BACKEND_URL)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to the VoiceAgent development backend running on your Mac.</string>
 	<key>UIApplicationSceneManifest</key>

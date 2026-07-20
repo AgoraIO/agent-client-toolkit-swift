@@ -1,0 +1,2 @@
+#include? "../Pods/Target Support Files/Pods-VoiceAgent/Pods-VoiceAgent.release.xcconfig"
+#include? "VoiceAgent-Local.xcconfig"

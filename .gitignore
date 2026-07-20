@@ -15,3 +15,4 @@ build/
 .build/
 
 VoiceAgent/Secrets.plist
+Config/VoiceAgent-Local.xcconfig
