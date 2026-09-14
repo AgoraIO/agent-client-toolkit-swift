@@ -16,7 +16,7 @@ KEEP_STAGING="${KEEP_STAGING:-0}"
 VERSION="${VERSION:-}"
 
 if [[ -z "$VERSION" ]]; then
-  echo "Unable to resolve version. Pass VERSION=2.9.0." >&2
+  echo "Unable to resolve version. Pass VERSION=<version>." >&2
   exit 1
 fi
 

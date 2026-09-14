@@ -15,19 +15,45 @@ import AVFAudio
 private enum ChatMessageComposerMode {
     case text
     case image
+    case speak
+    case think
+}
+
+private struct ChatMessageComposerOptions {
+    let priority: Priority
+    let listeningAction: ThinkListeningAction
+    let thinkingAction: ThinkThinkingAction
+    let speakingAction: ThinkSpeakingAction
+    let interruptable: Bool
+    let includeMetadata: Bool
 }
 
 private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
-    private let titleLabel = UILabel()
-    private let headerStackView = UIStackView()
-    private let textModeButton = UIButton(type: .system)
-    private let imageModeButton = UIButton(type: .system)
+    private let contentStackView = UIStackView()
+    private let modeControl = UISegmentedControl(items: ["Text", "Image", "Speak", "Think"])
+    private let optionsStackView = UIStackView()
+    private let priorityRow = UIStackView()
+    private let priorityButton = UIButton(type: .system)
+    private let listeningRow = UIStackView()
+    private let listeningButton = UIButton(type: .system)
+    private let thinkingRow = UIStackView()
+    private let thinkingButton = UIButton(type: .system)
+    private let speakingRow = UIStackView()
+    private let speakingButton = UIButton(type: .system)
+    private let interruptableRow = UIStackView()
+    private let interruptableSwitch = UISwitch()
+    private let metadataRow = UIStackView()
+    private let metadataSwitch = UISwitch()
     private let inputRowView = UIStackView()
     private let inputTextField = UITextField()
     private let sendButton = UIButton(type: .system)
 
     private var mode: ChatMessageComposerMode = .text
-    var onSend: ((ChatMessageComposerMode, String) -> Bool)?
+    private var priority: Priority = .interrupt
+    private var listeningAction: ThinkListeningAction = .interrupt
+    private var thinkingAction: ThinkThinkingAction = .ignore
+    private var speakingAction: ThinkSpeakingAction = .ignore
+    var onSend: ((ChatMessageComposerMode, String, ChatMessageComposerOptions) -> Bool)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -47,28 +73,64 @@ private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
         layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         clipsToBounds = true
 
-        headerStackView.axis = .horizontal
-        headerStackView.alignment = .center
-        headerStackView.distribution = .fill
-        headerStackView.spacing = 8
-        addSubview(headerStackView)
+        contentStackView.axis = .vertical
+        contentStackView.spacing = 8
+        addSubview(contentStackView)
 
-        titleLabel.text = "Chat"
-        titleLabel.textColor = AppColors.textTitle
-        titleLabel.font = .systemFont(ofSize: 16, weight: .bold)
-        titleLabel.setContentHuggingPriority(.required, for: .horizontal)
-        headerStackView.addArrangedSubview(titleLabel)
+        modeControl.selectedSegmentIndex = 0
+        modeControl.selectedSegmentTintColor = AppColors.accentBlue
+        modeControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        modeControl.setTitleTextAttributes([.foregroundColor: AppColors.textSubtitle], for: .normal)
+        contentStackView.addArrangedSubview(modeControl)
 
-        configureModeButton(textModeButton, title: "Text", imageName: "message")
-        configureModeButton(imageModeButton, title: "Image URL", imageName: "photo")
-        headerStackView.addArrangedSubview(textModeButton)
-        headerStackView.addArrangedSubview(imageModeButton)
+        optionsStackView.axis = .vertical
+        optionsStackView.spacing = 4
+        contentStackView.addArrangedSubview(optionsStackView)
+
+        configureOptionRow(priorityRow, title: "Priority", control: priorityButton)
+        configureOptionRow(listeningRow, title: "While listening", control: listeningButton)
+        configureOptionRow(thinkingRow, title: "While thinking", control: thinkingButton)
+        configureOptionRow(speakingRow, title: "While speaking", control: speakingButton)
+        configureOptionRow(interruptableRow, title: "Interruptable", control: interruptableSwitch)
+        configureOptionRow(metadataRow, title: "Include demo metadata", control: metadataSwitch)
+        [priorityRow, listeningRow, thinkingRow, speakingRow, interruptableRow, metadataRow]
+            .forEach { optionsStackView.addArrangedSubview($0) }
+
+        priorityButton.menu = UIMenu(children: Priority.allCases.map { priority in
+            UIAction(title: priority.stringValue) { [weak self] _ in
+                self?.priority = priority
+                self?.updateOptionTitles()
+            }
+        })
+        listeningButton.menu = UIMenu(children: ThinkListeningAction.allCases.map { action in
+            UIAction(title: action.stringValue.uppercased()) { [weak self] _ in
+                self?.listeningAction = action
+                self?.updateOptionTitles()
+            }
+        })
+        thinkingButton.menu = UIMenu(children: ThinkThinkingAction.allCases.map { action in
+            UIAction(title: action.stringValue.uppercased()) { [weak self] _ in
+                self?.thinkingAction = action
+                self?.updateOptionTitles()
+            }
+        })
+        speakingButton.menu = UIMenu(children: ThinkSpeakingAction.allCases.map { action in
+            UIAction(title: action.stringValue.uppercased()) { [weak self] _ in
+                self?.speakingAction = action
+                self?.updateOptionTitles()
+            }
+        })
+        [priorityButton, listeningButton, thinkingButton, speakingButton].forEach {
+            $0.showsMenuAsPrimaryAction = true
+        }
+        interruptableSwitch.isOn = true
+        metadataSwitch.isOn = false
 
         inputRowView.axis = .horizontal
         inputRowView.alignment = .fill
         inputRowView.distribution = .fill
         inputRowView.spacing = 10
-        addSubview(inputRowView)
+        contentStackView.addArrangedSubview(inputRowView)
 
         configureInputField(inputTextField)
         inputTextField.delegate = self
@@ -77,24 +139,28 @@ private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
         configureSendButton(sendButton)
         inputRowView.addArrangedSubview(sendButton)
 
-        textModeButton.addTarget(self, action: #selector(textModeButtonTapped), for: .touchUpInside)
-        imageModeButton.addTarget(self, action: #selector(imageModeButtonTapped), for: .touchUpInside)
+        modeControl.addTarget(self, action: #selector(modeChanged), for: .valueChanged)
         sendButton.addTarget(self, action: #selector(sendButtonTapped), for: .touchUpInside)
     }
 
-    private func configureModeButton(_ button: UIButton, title: String, imageName: String) {
-        button.setTitle(title, for: .normal)
-        button.setImage(UIImage(systemName: imageName)?.withRenderingMode(.alwaysTemplate), for: .normal)
-        button.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
-        button.titleLabel?.adjustsFontSizeToFitWidth = true
-        button.titleLabel?.minimumScaleFactor = 0.8
-        button.tintColor = AppColors.textSubtitle
-        button.layer.cornerRadius = 8
-        button.layer.borderWidth = 1
-        button.layer.borderColor = AppColors.borderDefault.cgColor
-        button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
-        button.imageEdgeInsets = UIEdgeInsets(top: 0, left: -2, bottom: 0, right: 4)
-        button.clipsToBounds = true
+    private func configureOptionRow(_ row: UIStackView, title: String, control: UIView) {
+        row.axis = .horizontal
+        row.alignment = .center
+        row.heightAnchor.constraint(equalToConstant: 40).isActive = true
+
+        let label = UILabel()
+        label.text = title
+        label.textColor = AppColors.textPrimary
+        label.font = .systemFont(ofSize: 13)
+        row.addArrangedSubview(label)
+        row.addArrangedSubview(control)
+
+        if let button = control as? UIButton {
+            button.setTitleColor(AppColors.textPrimary, for: .normal)
+            button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+            button.contentHorizontalAlignment = .trailing
+            button.widthAnchor.constraint(equalToConstant: 150).isActive = true
+        }
     }
 
     private func configureInputField(_ textField: UITextField) {
@@ -122,27 +188,18 @@ private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
     }
 
     private func setupConstraints() {
-        headerStackView.snp.makeConstraints { make in
+        contentStackView.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(12)
             make.left.right.equalToSuperview().inset(12)
-            make.height.equalTo(36)
+            make.bottom.equalToSuperview().inset(16)
         }
 
-        textModeButton.snp.makeConstraints { make in
-            make.width.equalTo(82)
-            make.height.equalTo(36)
-        }
-
-        imageModeButton.snp.makeConstraints { make in
-            make.width.equalTo(120)
+        modeControl.snp.makeConstraints { make in
             make.height.equalTo(36)
         }
 
         inputRowView.snp.makeConstraints { make in
-            make.top.equalTo(headerStackView.snp.bottom).offset(10)
-            make.left.right.equalToSuperview().inset(12)
             make.height.equalTo(48)
-            make.bottom.equalToSuperview().inset(16)
         }
 
         sendButton.snp.makeConstraints { make in
@@ -152,30 +209,46 @@ private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
 
     private func applyMode(_ newMode: ChatMessageComposerMode) {
         mode = newMode
+        modeControl.selectedSegmentIndex = [
+            ChatMessageComposerMode.text,
+            .image,
+            .speak,
+            .think
+        ].firstIndex(of: mode) ?? 0
         inputTextField.attributedPlaceholder = NSAttributedString(
-            string: mode == .text ? "Type a message" : "Paste image URL",
+            string: {
+                switch mode {
+                case .text: return "Type a chat message"
+                case .image: return "Paste image URL"
+                case .speak: return "Text for direct speech"
+                case .think: return "Instruction for the LLM"
+                }
+            }(),
             attributes: [.foregroundColor: AppColors.textTertiary]
         )
-        inputTextField.keyboardType = mode == .text ? .default : .URL
-        inputTextField.autocapitalizationType = mode == .text ? .sentences : .none
-        inputTextField.autocorrectionType = mode == .text ? .default : .no
-        updateModeButton(textModeButton, selected: mode == .text)
-        updateModeButton(imageModeButton, selected: mode == .image)
+        inputTextField.keyboardType = mode == .image ? .URL : .default
+        inputTextField.autocapitalizationType = mode == .image ? .none : .sentences
+        inputTextField.autocorrectionType = mode == .image ? .no : .default
+        priorityRow.isHidden = mode != .text && mode != .speak
+        listeningRow.isHidden = mode != .think
+        thinkingRow.isHidden = mode != .think
+        speakingRow.isHidden = mode != .think
+        interruptableRow.isHidden = mode == .image
+        metadataRow.isHidden = mode != .think
+        updateOptionTitles()
         inputTextField.reloadInputViews()
     }
 
-    private func updateModeButton(_ button: UIButton, selected: Bool) {
-        button.backgroundColor = selected ? AppColors.accentBlue : AppColors.bgTertiary
-        button.setTitleColor(selected ? .white : AppColors.textSubtitle, for: .normal)
-        button.tintColor = selected ? .white : AppColors.textSubtitle
+    private func updateOptionTitles() {
+        priorityButton.setTitle(priority.stringValue, for: .normal)
+        listeningButton.setTitle(listeningAction.stringValue.uppercased(), for: .normal)
+        thinkingButton.setTitle(thinkingAction.stringValue.uppercased(), for: .normal)
+        speakingButton.setTitle(speakingAction.stringValue.uppercased(), for: .normal)
     }
 
-    @objc private func textModeButtonTapped() {
-        applyMode(.text)
-    }
-
-    @objc private func imageModeButtonTapped() {
-        applyMode(.image)
+    @objc private func modeChanged() {
+        let modes: [ChatMessageComposerMode] = [.text, .image, .speak, .think]
+        applyMode(modes[modeControl.selectedSegmentIndex])
     }
 
     @objc private func sendButtonTapped() {
@@ -184,7 +257,15 @@ private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
 
     @discardableResult
     private func sendMessage() -> Bool {
-        let sent = onSend?(mode, inputTextField.text ?? "") ?? false
+        let options = ChatMessageComposerOptions(
+            priority: priority,
+            listeningAction: listeningAction,
+            thinkingAction: thinkingAction,
+            speakingAction: speakingAction,
+            interruptable: interruptableSwitch.isOn,
+            includeMetadata: metadataSwitch.isOn
+        )
+        let sent = onSend?(mode, inputTextField.text ?? "", options) ?? false
         if sent {
             hide()
         }
@@ -196,16 +277,26 @@ private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
     }
 
     func show() {
+        priority = .interrupt
+        listeningAction = .interrupt
+        thinkingAction = .ignore
+        speakingAction = .ignore
+        interruptableSwitch.isOn = true
+        metadataSwitch.isOn = false
         applyMode(.text)
         inputTextField.text = ""
         isHidden = false
-        inputTextField.becomeFirstResponder()
     }
 
     func hide() {
         guard !isHidden else { return }
         inputTextField.resignFirstResponder()
+        setCompactInputMode(false)
         isHidden = true
+    }
+
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        setCompactInputMode(true)
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
@@ -214,7 +305,11 @@ private final class ChatMessageInputPanelView: UIView, UITextFieldDelegate {
     }
 
     func textFieldDidEndEditing(_ textField: UITextField) {
-        isHidden = true
+        setCompactInputMode(false)
+    }
+
+    private func setCompactInputMode(_ isCompact: Bool) {
+        optionsStackView.isHidden = isCompact
     }
 }
 
@@ -465,12 +560,31 @@ class ViewController: UIViewController {
         connectionStartView.update(for: .ready)
 
         view.addSubview(chatInputPanelView)
-        chatInputPanelView.onSend = { [weak self] mode, input in
+        chatInputPanelView.onSend = { [weak self] mode, input, options in
             switch mode {
             case .text:
-                return self?.sendTextMessage(input) ?? false
+                return self?.sendTextMessage(
+                    input,
+                    priority: options.priority,
+                    responseInterruptable: options.interruptable
+                ) ?? false
             case .image:
                 return self?.sendImageUrlMessage(input) ?? false
+            case .speak:
+                return self?.sendSpeakMessage(
+                    input,
+                    priority: options.priority,
+                    interruptable: options.interruptable
+                ) ?? false
+            case .think:
+                return self?.sendThinkMessage(
+                    input,
+                    onListeningAction: options.listeningAction,
+                    onThinkingAction: options.thinkingAction,
+                    onSpeakingAction: options.speakingAction,
+                    interruptable: options.interruptable,
+                    includeMetadata: options.includeMetadata
+                ) ?? false
             }
         }
     }
@@ -1040,14 +1154,23 @@ class ViewController: UIViewController {
         return true
     }
 
-    private func sendTextMessage(_ text: String) -> Bool {
+    private func sendTextMessage(
+        _ text: String,
+        priority: Priority,
+        responseInterruptable: Bool
+    ) -> Bool {
         let content = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !content.isEmpty else {
             addDebugMessage("Send text failed error=Text is empty")
             return false
         }
-        let message = TextMessage(priority: .interrupt, interruptable: true, text: content)
-        return sendChatMessage(label: "Text", message: message)
+        let options = "priority=\(priority.stringValue), responseInterruptable=\(responseInterruptable)"
+        let message = TextMessage(
+            priority: priority,
+            interruptable: responseInterruptable,
+            text: content
+        )
+        return sendChatMessage(label: "Text", message: message, options: options)
     }
 
     private func sendImageUrlMessage(_ imageUrl: String) -> Bool {
@@ -1064,6 +1187,81 @@ class ViewController: UIViewController {
         return sendChatMessage(label: "Image", message: message)
     }
 
+    private func sendSpeakMessage(
+        _ text: String,
+        priority: Priority,
+        interruptable: Bool
+    ) -> Bool {
+        let content = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else {
+            addDebugMessage("Send Speak failed error=Text is empty")
+            return false
+        }
+        guard let convoAIAPI = requireConnectedConvoAIAPI(action: "Send Speak") else {
+            return false
+        }
+        let options = "priority=\(priority.stringValue), interruptable=\(interruptable)"
+        convoAIAPI.speak(
+            agentUserId: "\(agentUid)",
+            message: SpeakMessage(
+                text: content,
+                priority: priority,
+                interruptable: interruptable
+            )
+        ) { [weak self] error in
+            DispatchQueue.main.async {
+                if let error {
+                    self?.addDebugMessage("Send Speak failed \(options) error=\(error.message)")
+                } else {
+                    self?.addDebugMessage("Send Speak successfully \(options)")
+                }
+            }
+        }
+        return true
+    }
+
+    private func sendThinkMessage(
+        _ text: String,
+        onListeningAction: ThinkListeningAction,
+        onThinkingAction: ThinkThinkingAction,
+        onSpeakingAction: ThinkSpeakingAction,
+        interruptable: Bool,
+        includeMetadata: Bool
+    ) -> Bool {
+        let content = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else {
+            addDebugMessage("Send Think failed error=Text is empty")
+            return false
+        }
+        guard let convoAIAPI = requireConnectedConvoAIAPI(action: "Send Think") else {
+            return false
+        }
+        let options = "listening=\(onListeningAction.stringValue), "
+            + "thinking=\(onThinkingAction.stringValue), "
+            + "speaking=\(onSpeakingAction.stringValue), "
+            + "interruptable=\(interruptable), metadata=\(includeMetadata)"
+        convoAIAPI.think(
+            agentUserId: "\(agentUid)",
+            message: ThinkMessage(
+                text: content,
+                onListeningAction: onListeningAction,
+                onThinkingAction: onThinkingAction,
+                onSpeakingAction: onSpeakingAction,
+                interruptable: interruptable,
+                metadata: includeMetadata ? ["source": "swift_demo"] : nil
+            )
+        ) { [weak self] error in
+            DispatchQueue.main.async {
+                if let error {
+                    self?.addDebugMessage("Send Think failed \(options) error=\(error.message)")
+                } else {
+                    self?.addDebugMessage("Send Think successfully \(options)")
+                }
+            }
+        }
+        return true
+    }
+
     private func sendInterrupt() {
         guard let convoAIAPI = requireConnectedConvoAIAPI(action: "Interrupt") else { return }
         convoAIAPI.interrupt(agentUserId: "\(agentUid)") { [weak self] error in
@@ -1077,16 +1275,21 @@ class ViewController: UIViewController {
         }
     }
 
-    private func sendChatMessage(label: String, message: ChatMessage) -> Bool {
+    private func sendChatMessage(
+        label: String,
+        message: ChatMessage,
+        options: String? = nil
+    ) -> Bool {
         guard let convoAIAPI = requireConnectedConvoAIAPI(action: "Send \(label)") else {
             return false
         }
+        let optionSuffix = options.map { " \($0)" } ?? ""
         convoAIAPI.chat(agentUserId: "\(agentUid)", message: message) { [weak self] error in
             DispatchQueue.main.async {
                 if let error = error {
-                    self?.addDebugMessage("Send \(label) failed error=\(error.message)")
+                    self?.addDebugMessage("Send \(label) failed\(optionSuffix) error=\(error.message)")
                 } else {
-                    self?.addDebugMessage("Send \(label) successfully")
+                    self?.addDebugMessage("Send \(label) successfully\(optionSuffix)")
                 }
             }
         }

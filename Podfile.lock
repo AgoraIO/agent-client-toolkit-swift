@@ -1,5 +1,5 @@
 PODS:
-  - agent-client-toolkit-swift (2.9.0):
+  - agent-client-toolkit-swift (2.10.0):
     - AgoraRtcEngine_iOS (>= 4.5.1)
     - AgoraRtm/RtmKit (>= 2.2.3)
   - AgoraInfra_iOS (1.2.13)
@@ -64,12 +64,12 @@ EXTERNAL SOURCES:
     :path: "./AgoraAgentClientToolkit"
 
 SPEC CHECKSUMS:
-  agent-client-toolkit-swift: 2ef5143263fd9276e1a748c648d92dc8b35be051
+  agent-client-toolkit-swift: 7b7a24a8c7a05001e4d1d61e9e9e476cbd445438
   AgoraInfra_iOS: 65e11a2183ab7836258768868d06058c22701b13
   AgoraRtcEngine_iOS: 5092a058c7b2842db39d8ca614d451af6f84969a
   AgoraRtm: b480b23cf4756efbde6af18233afecd937a8d1c4
   SnapKit: d612e99e678a2d3b95bf60b0705ed0a35c03484a
 
-PODFILE CHECKSUM: a621d6274adbc0e6a869548dc25a82d549fb71fc
+PODFILE CHECKSUM: 5d908dce396d2e677055dd3288c78ea5a414e226
 
 COCOAPODS: 1.16.2

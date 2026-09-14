@@ -62,6 +62,13 @@ shared account, TestFlight build, or maintained prebuilt app. See
 [ARCHITECTURE.md](./ARCHITECTURE.md) for the runtime sequence and ownership
 boundaries.
 
+While connected, the message panel provides four modes: Text, Image, Speak,
+and Think. Text and Speak expose all `.interrupt`, `.append`, and `.ignore`
+priorities. Think exposes every listening, thinking, and speaking action plus
+interruptability and optional demo metadata. The initially selected values
+match the API defaults: Speak priority `.interrupt`; Think listening
+`.interrupt`, thinking `.ignore`, speaking `.ignore`; interruptability enabled.
+
 ## Install
 
 Choose one package manager to integrate `AgoraAgentClientToolkit`. Do not integrate the same component through CocoaPods and Swift Package Manager at the same time.
@@ -72,7 +79,7 @@ Choose one package manager to integrate `AgoraAgentClientToolkit`. Do not integr
 target 'YourApp' do
   use_frameworks!
 
-  pod 'agent-client-toolkit-swift', '2.9.0'
+  pod 'agent-client-toolkit-swift', '2.10.0'
 end
 ```
 
@@ -83,13 +90,13 @@ If your project uses a custom or private CocoaPods specs repository, add that so
 
 ### Swift Package Manager
 
-In Xcode, use `File > Add Package Dependencies...`, enter `https://github.com/AgoraIO/agent-client-toolkit-swift.git`, select version `2.9.0` or later, and add the `AgoraAgentClientToolkit` product to your app target.
+In Xcode, use `File > Add Package Dependencies...`, enter `https://github.com/AgoraIO/agent-client-toolkit-swift.git`, select version `2.10.0` or later, and add the `AgoraAgentClientToolkit` product to your app target.
 
 If you manage dependencies in `Package.swift`, use:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/AgoraIO/agent-client-toolkit-swift.git", from: "2.9.0")
+    .package(url: "https://github.com/AgoraIO/agent-client-toolkit-swift.git", from: "2.10.0")
 ]
 ```
 

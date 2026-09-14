@@ -53,7 +53,8 @@ dependency. The sample does not copy or modify Toolkit source.
 - `GET /get_config`, `POST /startAgent`, and `POST /stopAgent`
 - RTC and RTM initialization from backend-returned App ID, UID, and user token
 - `ConversationalAIAPI` creation, subscription, callbacks, and destruction
-- transcript, latency, state, chat, interrupt, manual SOS/EOS, and mute UI
+- transcript, latency, state, Text/Image chat, Speak/Think, interrupt, manual
+  SOS/EOS, and mute UI
 - local teardown that does not wait for the backend stop response
 
 The iOS bundle contains only `AGENT_BACKEND_URL`. It does not contain an App
@@ -120,11 +121,19 @@ RTC audio + RTM events
   -> AgoraAgentClientToolkit
   -> ViewController callbacks
   -> transcript / latency / state UI
+
+Text / Image / Speak / Think / control actions
+  -> AgoraAgentClientToolkit
+  -> point-to-point RTM publish to agentUserId
+  -> Agora Conversational AI agent
 ```
 
-Text messages, image URLs, interrupt, and manual SOS/EOS continue to use
-`ConversationalAIAPI`. Agent state and transcript data are never fabricated
-from the `/startAgent` HTTP response.
+Text messages and image URLs use `chat(...)`. Direct TTS uses `speak(...)` with
+RTM custom type `assistant.transcription`; LLM instructions use `think(...)`
+with RTM custom type `user.transcription`. Speak and Think publish directly to
+the Agent's RTM user ID and do not call the Python backend. Interrupt and manual
+SOS/EOS also continue to use `ConversationalAIAPI`. Agent state and transcript
+data are never fabricated from the `/startAgent` HTTP response.
 
 ## Stop and Failure Cleanup
 

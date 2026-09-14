@@ -1,0 +1,65 @@
+name: Source CI
+
+on:
+  push:
+    branches: [source/main]
+    tags:
+      - "*"
+  pull_request:
+    branches: [source/main]
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install backend dependencies
+        run: |
+          uv venv
+          uv pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Check backend sources
+        run: .venv/bin/python -m py_compile src/*.py
+
+      - name: Test backend
+        run: .venv/bin/python -m pytest -q
+
+  ios:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test Swift sources
+        run: ./scripts/test_swift.sh
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install CocoaPods
+        run: gem install cocoapods -v 1.16.2 --no-document
+
+      - name: Install CocoaPods dependencies
+        run: pod _1.16.2_ install --deployment
+
+      - name: Build demo for iOS Simulator
+        run: >-
+          xcodebuild
+          -workspace VoiceAgent.xcworkspace
+          -scheme VoiceAgent
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build

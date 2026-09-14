@@ -18,3 +18,10 @@ swiftc \
   "${ROOT_DIR}/Tests/BackendClientTests.swift" \
   -o "${BUILD_DIR}/backend-client-tests"
 "${BUILD_DIR}/backend-client-tests"
+
+swiftc \
+  "${ROOT_DIR}/AgoraAgentClientToolkit/AgoraAgentClientToolkit/Classes/MessageModels.swift" \
+  "${ROOT_DIR}/AgoraAgentClientToolkit/AgoraAgentClientToolkit/Classes/MessagePayloadBuilder.swift" \
+  "${ROOT_DIR}/Tests/SpeakThinkMessageTests.swift" \
+  -o "${BUILD_DIR}/speak-think-message-tests"
+"${BUILD_DIR}/speak-think-message-tests"

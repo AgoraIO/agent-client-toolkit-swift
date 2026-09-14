@@ -8,9 +8,9 @@ target 'VoiceAgent' do
   pod 'agent-client-toolkit-swift', :path => './AgoraAgentClientToolkit'
 
   # Published pod verification: comment the local path pod above, then
-  # uncomment this line after agent-client-toolkit-swift 2.9.0 is available
+  # uncomment this line after agent-client-toolkit-swift 2.10.0 is available
   # in the CocoaPods specs repo used by your Podfile.
-  # pod 'agent-client-toolkit-swift', '2.9.0'
+  # pod 'agent-client-toolkit-swift', '2.10.0'
 
   pod 'AgoraRtcEngine_iOS', '4.5.1'
   # Use RTM lite version (RtmKit subspec) to avoid aosl.xcframework conflict with RTC SDK

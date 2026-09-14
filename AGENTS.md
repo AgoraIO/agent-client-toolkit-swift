@@ -18,8 +18,8 @@ FastAPI service under `server/` owns all secrets, combined user token
 generation, and agent lifecycle operations through `agora-agents==2.4.1`.
 
 Current demo scope includes startup-time independent SOS/EOS selection,
-transcript and latency rendering, agent state, interrupt, text and image URL
-messages, manual SOS/EOS, mute, and stop.
+transcript and latency rendering, agent state, interrupt, text, image URL,
+speak and think messages, manual SOS/EOS, mute, and stop.
 
 ## Tech Stack
 
@@ -96,6 +96,11 @@ messages, manual SOS/EOS, mute, and stop.
 - Continue consuming the local Pod and importing `AgoraAgentClientToolkit`.
 - Do not copy its source into `VoiceAgent/` or modify Toolkit public APIs from
   the sample app.
+- Keep `chat(...)` limited to `TextMessage` and `ImageMessage`. `speak(...)`
+  and `think(...)` are independent point-to-point RTM APIs addressed by
+  `agentUserId` and do not use the Python backend.
+- Speak uses RTM custom type `assistant.transcription`; Think uses
+  `user.transcription`.
 - Render mode remains `.words`.
 - Cleanup must unsubscribe, remove the event handler, destroy Toolkit, log out
   and destroy the RTM client, and destroy the RTC engine.
@@ -219,15 +224,15 @@ Rehoboam is the internal release platform for both CocoaPods and SwiftPM. Do not
 
 Release strategy:
 
-- Publish only formal SemVer versions, for example `2.9.0`; do not publish prerelease or SNAPSHOT versions.
+- Publish only formal SemVer versions; do not publish prerelease or SNAPSHOT versions.
 - Complete package plus sample or clean-app validation before formal publication.
 - If a problem is found after the final version is published, do not overwrite or delete that version; publish a new version such as `2.9.1`.
 
 To prepare the Rehoboam upload zips:
 
 ```bash
-VERSION=2.9.0 scripts/build_rehoboam_cocoapods_input_zip.sh
-VERSION=2.9.0 scripts/build_rehoboam_swiftpm_input_zip.sh
+VERSION=<version> scripts/build_rehoboam_cocoapods_input_zip.sh
+VERSION=<version> scripts/build_rehoboam_swiftpm_input_zip.sh
 ```
 
 The generated zips are:

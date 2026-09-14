@@ -4,7 +4,16 @@ All notable changes to the iOS Agora Conversational AI Toolkit will be documente
 
 The format follows Keep a Changelog style. This first public release establishes the compatibility baseline for future iOS releases.
 
-## [Unreleased]
+## [2.10.0] - 2026-08-13
+
+### Added
+
+- Added independent RTM `speak(...)` and `think(...)` APIs for direct TTS
+  broadcasts and per-state LLM instructions.
+- Added `SpeakMessage`, `ThinkMessage`, and type-safe listening, thinking, and
+  speaking action enums. `SpeakMessage` reuses the existing `Priority` enum.
+- Added UIKit demo controls and payload tests covering every Speak priority,
+  every Think action, interrupt behavior, and optional metadata.
 
 ### Deprecated
 

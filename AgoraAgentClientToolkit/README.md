@@ -128,6 +128,8 @@ func removeHandler(handler: ConversationalAIAPIEventHandler)
 func subscribeMessage(channelName: String, completion: @escaping (ConversationalAIAPIError?) -> Void)
 func unsubscribeMessage(channelName: String, completion: @escaping (ConversationalAIAPIError?) -> Void)
 func chat(agentUserId: String, message: ChatMessage, completion: @escaping (ConversationalAIAPIError?) -> Void)
+func speak(agentUserId: String, message: SpeakMessage, completion: @escaping (ConversationalAIAPIError?) -> Void)
+func think(agentUserId: String, message: ThinkMessage, completion: @escaping (ConversationalAIAPIError?) -> Void)
 func interrupt(agentUserId: String, completion: @escaping (ConversationalAIAPIError?) -> Void)
 func manualSOS(agentUserId: String, completion: @escaping (String, ConversationalAIAPIError?) -> Void)
 func manualEOS(agentUserId: String, completion: @escaping (String, ConversationalAIAPIError?) -> Void)
@@ -232,6 +234,54 @@ conversationalAIAPI.chat(agentUserId: agentUserId, message: message) { error in
 
 Use `url` for large images. `base64` must stay within RTM message size limits.
 
+Broadcast text directly through the agent's TTS pipeline without LLM processing:
+
+```swift
+let message = SpeakMessage(
+    text: "Your order is ready.",
+    priority: .interrupt,
+    interruptable: true
+)
+
+conversationalAIAPI.speak(agentUserId: agentUserId, message: message) { error in
+    // error is nil when RTM publish succeeds.
+}
+```
+
+`SpeakMessage.priority` supports `.interrupt`, `.append`, and `.ignore`, and
+defaults to `.interrupt`.
+
+Send an instruction through the agent's LLM pipeline:
+
+```swift
+let message = ThinkMessage(
+    text: "The user selected express shipping.",
+    onListeningAction: .interrupt,
+    onThinkingAction: .ignore,
+    onSpeakingAction: .ignore,
+    interruptable: true,
+    metadata: ["order_id": "order-123"]
+)
+
+conversationalAIAPI.think(agentUserId: agentUserId, message: message) { error in
+    // error is nil when RTM publish succeeds.
+}
+```
+
+Think actions control how an instruction is handled for each current agent
+state. Their supported values are:
+
+| Agent state | Type | Values | Default |
+|-------------|------|--------|---------|
+| Listening | `ThinkListeningAction` | `.inject`, `.interrupt`, `.ignore`, `.append` | `.interrupt` |
+| Thinking | `ThinkThinkingAction` | `.interrupt`, `.ignore`, `.append` | `.ignore` |
+| Speaking | `ThinkSpeakingAction` | `.interrupt`, `.ignore`, `.append` | `.ignore` |
+
+`metadata` is optional custom business data. Passing `nil` omits it from the
+RTM payload. Both APIs publish point-to-point to `agentUserId`: `speak(...)`
+uses RTM custom type `assistant.transcription`, while `think(...)` uses
+`user.transcription`.
+
 Interrupt the agent:
 
 ```swift
@@ -267,15 +317,20 @@ through manual turn callbacks.
 | Type | Purpose |
 |------|---------|
 | `ConversationalAIAPIConfig` | Supplies `AgoraRtcEngineKit`, `AgoraRtmClientKit`, transcript render mode, and logging options |
-| `ConversationalAIAPI` | Main API for handlers, subscription, chat, interrupt, manual SOS/EOS, audio settings, and destroy |
+| `ConversationalAIAPI` | Main API for handlers, subscription, chat, speak, think, interrupt, manual SOS/EOS, audio settings, and destroy |
 | `ConversationalAIAPIEventHandler` | Main callback interface for state, transcripts, errors, metrics, receipts, manual turn results, and debug logs |
+| `SpeakMessage` | Direct TTS text, priority, and interrupt behavior |
+| `ThinkMessage` | LLM instruction, per-state actions, interrupt behavior, and optional metadata |
+| `ThinkListeningAction` | Think behavior while listening: `.inject`, `.interrupt`, `.ignore`, `.append` |
+| `ThinkThinkingAction` | Think behavior while thinking: `.interrupt`, `.ignore`, `.append` |
+| `ThinkSpeakingAction` | Think behavior while speaking: `.interrupt`, `.ignore`, `.append` |
 | `Transcript` | UI-ready transcript payload with turn ID, user ID, text, status, type, and render mode |
 | `AgentState` | Agent lifecycle state: `.idle`, `.silent`, `.listening`, `.thinking`, `.speaking`, `.unknown` |
 | `UserManualSosEvent` | Result for a user-triggered manual SOS request |
 | `UserManualEosEvent` | Result for a user-triggered manual EOS request |
 | `AgentManualEosEvent` | Automatic EOS notification in manual mode |
 | `ConversationalAIAPIError` | Error wrapper for RTM, RTC, and unknown failures |
-| `Priority` | Chat priority: `.interrupt`, `.append`, `.ignore` |
+| `Priority` | Text chat and Speak priority: `.interrupt`, `.append`, `.ignore` |
 
 ## Lifecycle Checklist
 
@@ -336,8 +391,9 @@ Check that RTM is logged in, `subscribeMessage(channelName)` succeeded, and `age
 
 ## File Structure
 
-- [ConversationalAIAPI.swift](./AgoraAgentClientToolkit/Classes/ConversationalAIAPI.swift) - API interfaces and related data structures and enums
+- [ConversationalAIAPI.swift](./AgoraAgentClientToolkit/Classes/ConversationalAIAPI.swift) - API interfaces and event-related data structures
 - [ConversationalAIAPIImpl.swift](./AgoraAgentClientToolkit/Classes/ConversationalAIAPIImpl.swift) - main implementation
+- [MessageModels.swift](./AgoraAgentClientToolkit/Classes/MessageModels.swift) - message models, priorities, and Think action enums
 - [Transcript/](./AgoraAgentClientToolkit/Classes/Transcript/) - transcript parsing and rendering support
 
 ## Support

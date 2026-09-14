@@ -9,48 +9,6 @@ import Foundation
 import AgoraRtcKit
 import AgoraRtmKit
 
-/// Message priority levels for AI agent processing
-/// You can control the broadcast behavior by specifying the following parameters.
-@objc public enum Priority: Int {
-    /// High priority - The agent will immediately stop current
-    /// interaction and process this message. Use for urgent or time-sensitive messages
-    case interrupt = 0
-    /// Medium priority - The agent will queue this message and process it
-    /// after the current interaction completes. Use for follow-up questions.
-    case append = 1
-    /// Low priority - If the agent is currently interacting, this message
-    /// will be discarded. Only processed when agent is idle. Use for optional content.
-    case ignore = 2
-    
-    /// Convert priority to string value
-    /// - Returns: String representation of the priority
-    public var stringValue: String {
-        switch self {
-        case .interrupt:
-            return "INTERRUPT"
-        case .append:
-            return "APPEND"
-        case .ignore:
-            return "IGNORE"
-        }
-    }
-    
-    /// Initialize priority from string value
-    /// - Parameter stringValue: String representation of priority
-    public init?(stringValue: String) {
-        switch stringValue.uppercased() {
-        case "INTERRUPT":
-            self = .interrupt
-        case "APPEND":
-            self = .append
-        case "IGNORE":
-            self = .ignore
-        default:
-            return nil
-        }
-    }
-}
-
 /// Message type enumeration
 /// Used to distinguish different types of messages in the conversation system
 @objc public enum ChatMessageType: Int {
@@ -1056,6 +1014,22 @@ public enum MessageType: String, CaseIterable {
     ///   - completion: Callback function called when the operation completes.
     ///                 Returns nil on success, ConversationalAIAPIError on failure
     @objc func chat(agentUserId: String, message: ChatMessage, completion: @escaping (ConversationalAIAPIError?) -> Void)
+
+    /// Broadcast a message directly through the agent's TTS pipeline.
+    ///
+    /// - Parameters:
+    ///   - agentUserId: Agent RTM user ID, must be globally unique.
+    ///   - message: Message text and broadcast behavior.
+    ///   - completion: Callback; error is nil when RTM publish succeeds.
+    @objc func speak(agentUserId: String, message: SpeakMessage, completion: @escaping (ConversationalAIAPIError?) -> Void)
+
+    /// Send an instruction for the agent to process through the LLM pipeline.
+    ///
+    /// - Parameters:
+    ///   - agentUserId: Agent RTM user ID, must be globally unique.
+    ///   - message: Instruction and per-state behavior.
+    ///   - completion: Callback; error is nil when RTM publish succeeds.
+    @objc func think(agentUserId: String, message: ThinkMessage, completion: @escaping (ConversationalAIAPIError?) -> Void)
     
     /// Interrupt the AI Agent's current speech or processing
     /// Use this method to interrupt the currently speaking or processing Agent.
