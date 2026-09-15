@@ -52,8 +52,11 @@ prepare a new version for fixes after publication.
    All four values must be `X.Y.Z`. An explicit packaging version does not
    update compiled diagnostic constants. Keep the root README, component
    README, and published-dependency example in `Podfile` aligned. Run
-   `pod install` after changing the local podspec and include the resulting
-   `Podfile.lock` update. The demo's app version is independent of the SDK.
+   `pod _1.16.2_ install` after changing the local podspec and include the
+   resulting `Podfile.lock` update. Keep the lockfile's CocoaPods version
+   aligned with CI; `--deployment` rejects a lockfile version change even
+   when dependency versions are unchanged. The demo's app version is
+   independent of the SDK.
 
 3. Add a dated entry to [CHANGELOG.md](../CHANGELOG.md). Review public APIs,
    default behavior, callback timing, package identity, and minimum platform
