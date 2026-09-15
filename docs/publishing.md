@@ -1,171 +1,175 @@
-# Publishing
+# Releasing
 
-This document is for maintainers who need to prepare Rehoboam upload packages for the iOS CocoaPods and Swift Package Manager releases.
+This is the public maintainer checklist for preparing and verifying iOS SDK
+releases. Publishing credentials and service-specific operations belong in
+private maintainer documentation.
 
-## Artifact Names
+## Source and Distribution
 
-```text
-CocoaPods pod: agent-client-toolkit-swift
-CocoaPods Swift module: AgoraAgentClientToolkit
-SwiftPM package identity: agent-client-toolkit-swift
-SwiftPM product: AgoraAgentClientToolkit
-```
+| Purpose | Branch or tag |
+|---------|---------------|
+| Source development and release PRs | `source/main` |
+| Validated source release | `source/vX.Y.Z` |
+| SwiftPM binary distribution | `main` |
+| SwiftPM consumer version | `X.Y.Z` on the distribution history |
 
-For Rehoboam packaging, pass the version explicitly:
+The CocoaPods name is `agent-client-toolkit-swift`; the Swift module and
+SwiftPM product remain `AgoraAgentClientToolkit`. Release CocoaPods and
+SwiftPM with the same version when shipping them together. Replace `X.Y.Z`
+in every example with the intended unused stable SemVer version.
 
-```bash
-VERSION=<version> scripts/build_rehoboam_cocoapods_input_zip.sh
-VERSION=<version> scripts/build_rehoboam_swiftpm_input_zip.sh
-```
+Source tags record the code used to build a release. They do not publish
+CocoaPods or SwiftPM packages. Do not create an `X.Y.Z` distribution tag on a
+source commit. Never move a release tag or overwrite a published version;
+prepare a new version for fixes after publication.
 
-## SemVer and Changelog Gate
+## Prepare the Release PR
 
-Every release must update `CHANGELOG.md`.
+1. Confirm that the source tag, SwiftPM version tag, and CocoaPods version
+   are unused. Inspect the public tags and CocoaPods spec repository used
+   by consumers:
 
-- Patch releases are for compatible fixes, parser hardening, documentation corrections, and packaging metadata fixes.
-- Minor releases may add optional APIs, optional event fields, new callbacks with optional/default behavior, or new supported protocol events.
-- Major releases are required for source or binary incompatible public API changes, changed defaults, changed callback timing, changed package identity, or higher minimum platform baselines that exclude existing consumers.
+   ```bash
+   git ls-remote --tags https://github.com/AgoraIO/agent-client-toolkit-swift.git refs/tags/source/vX.Y.Z refs/tags/X.Y.Z
+   pod spec which agent-client-toolkit-swift --version=X.Y.Z
+   ```
 
-Publish only formal SemVer versions. Complete the required package and sample or
-clean-app validation before publication.
+   `pod spec which` searches installed spec repositories. Refresh those
+   repositories with `pod repo update` or inspect their upstream index before
+   deciding that a missing version is available. Network failures do not
+   prove that a version is unused.
 
-## Package the Rehoboam CocoaPods Input Zip
+2. Synchronize every SDK version location:
 
-Install demo workspace dependencies first:
+   | Location | Value |
+   |----------|-------|
+   | `AgoraAgentClientToolkit/agent-client-toolkit-swift.podspec` | `s.version` |
+   | `AgoraAgentClientToolkit/agent-client-toolkit-swift.binary.podspec.template` | `s.version` |
+   | `AgoraAgentClientToolkit/AgoraAgentClientToolkit/Classes/ConversationalAIAPIImpl.swift` | `ConversationalAIAPIImpl.version` |
+   | `AgoraAgentClientToolkit/AgoraAgentClientToolkit/Classes/Transcript/TranscriptController.swift` | `TranscriptController.version` |
 
-```bash
-pod install
-```
+   All four values must be `X.Y.Z`. An explicit packaging version does not
+   update compiled diagnostic constants. Keep the root README, component
+   README, and published-dependency example in `Podfile` aligned. Run
+   `pod install` after changing the local podspec and include the resulting
+   `Podfile.lock` update. The demo's app version is independent of the SDK.
 
-Run:
+3. Add a dated entry to [CHANGELOG.md](../CHANGELOG.md). Review public APIs,
+   default behavior, callback timing, package identity, and minimum platform
+   changes for compatibility. Use patch versions for compatible fixes, minor
+   versions for compatible additions, and major versions for breaking
+   changes. Document behavior changes, the compatibility rationale, and any
+   required migration or opt-in settings in the release notes.
 
-```bash
-VERSION=<version> scripts/build_rehoboam_cocoapods_input_zip.sh
-```
+4. Open the release PR against `source/main`. All backend, Swift, iOS demo
+   build, and Docker PR checks must pass. Use Python 3.10+, Xcode 16+, and
+   CocoaPods 1.16.2 to reproduce the source checks locally:
 
-The generated zip is written under:
+   ```bash
+   python3 -m venv server/.venv
+   server/.venv/bin/python -m pip install -r server/requirements.txt -r server/requirements-dev.txt
+   server/.venv/bin/python -m pytest server/tests -q
+   ./scripts/test_swift.sh
+   pod _1.16.2_ install --deployment
+   xcodebuild -workspace VoiceAgent.xcworkspace -scheme VoiceAgent \
+     -configuration Debug -sdk iphonesimulator \
+     -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+   ```
 
-```text
-build/internal-cocoapods/agora-agent-client-toolkit-<version>-<timestamp>/agora-agent-client-toolkit-<version>-cocoapods-rehoboam-input.zip
-```
+   Validate voice startup, transcripts, agent state, messaging, interrupt,
+   mute, manual SOS/EOS, and cleanup on a physical iPhone.
 
-The zip contains:
+## Tag the Validated Source
 
-```text
-agent-client-toolkit-swift.podspec
-sdk/
-`-- AgoraAgentClientToolkit.xcframework/
-```
+The source of truth for automated checks is
+[Source CI](../.github/workflows/ci.yml). It runs on PRs targeting `source/main`
+and pushes to `source/main`. Its current tag filter is `*`, which excludes
+`/` and therefore does **not** match `source/vX.Y.Z`. See the
+[GitHub filter rules](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#filter-pattern-cheat-sheet).
+The workflow has no package publishing or GitHub Release creation job.
+[Docker checks](../.github/workflows/docker.yml) run on PRs only.
 
-Upload this zip to Rehoboam as the CocoaPods release input. For the Rehoboam
-flow, leave `FILE_URL` unset unless the platform request explicitly asks for a
-prefilled binary URL; the staged podspec otherwise keeps the
-`REPLACE_WITH_BINARY_ZIP_URL` placeholder for the platform-side rewrite.
+After merging the release PR, verify successful `source/main` CI for the
+exact merged commit. Until the tag filter is updated, use that branch run as
+the source validation record; do not expect a source tag to start a new run.
 
-## Package the Rehoboam SwiftPM Input Zip
-
-SwiftPM is also published through Rehoboam. The maintainer-facing command is:
-
-```bash
-VERSION=<version> scripts/build_rehoboam_swiftpm_input_zip.sh
-```
-
-The script prints the generated Rehoboam upload file:
-
-```text
-build/internal-spm/agora-agent-client-toolkit-<version>-swiftpm-<timestamp>/agora-agent-client-toolkit-<version>-swiftpm-rehoboam-input.zip
-```
-
-Upload that zip to Rehoboam for the SwiftPM release.
-
-Internally, the uploaded zip contains `swiftpm_template/`. Rehoboam uses
-`swiftpm_template/sdk/AgoraAgentClientToolkit/Package.swift` as the input
-manifest, and that manifest must use `url` / `checksum` placeholders for the
-binary target:
-
-```swift
-.binaryTarget(
-    name: "AgoraAgentClientToolkit",
-    url: "{AgoraAgentClientToolkit_url}",
-    checksum: "{AgoraAgentClientToolkit_checksum}"
-)
-```
-
-The CI input shape must be:
-
-```text
-swiftpm_template/
-|-- ci/
-|   `-- build.yaml
-`-- sdk/
-    `-- AgoraAgentClientToolkit/
-        |-- Package.swift
-        |-- Sources/
-        |   `-- AgoraAgentClientToolkitDependencies/
-        `-- AgoraAgentClientToolkit.xcframework/
-```
-
-The artifact uploaded for SwiftPM must be a zip whose top-level entry is the
-xcframework directory itself:
-
-```text
-AgoraAgentClientToolkit.zip
-`-- AgoraAgentClientToolkit.xcframework/
-    |-- Info.plist
-    `-- ...
-```
-
-The final GitHub repository should contain the rewritten `Package.swift` and
-the `Sources/AgoraAgentClientToolkitDependencies/` wrapper target. It should
-not contain the `.xcframework` directory or the zip artifact.
-
-Install demo workspace dependencies first:
+Use a clean checkout. These examples assume `upstream` points to
+`AgoraIO/agent-client-toolkit-swift` and that you have tag push permission:
 
 ```bash
-pod install
+git fetch upstream source/main
+git switch --detach upstream/source/main
+git status --short
+git rev-parse HEAD
 ```
 
-The binary manifest keeps `AgoraAgentClientToolkit` as the public product and
-adds an internal dependency anchor target so SwiftPM resolves Agora RTC and RTM
-alongside the binary framework.
-
-The binary package pins SwiftPM dependencies by default:
-
-```text
-AgoraRtcEngine_iOS == 4.5.1
-AgoraRTM_iOS == 2.2.8
-```
-
-Rehoboam validates the uploaded package and the generated SwiftPM package. Its
-platform-side release checks must include the following checks; run them locally
-only when debugging generated Rehoboam output:
+Confirm that the checkout has no changes and the printed SHA is the commit
+whose source CI passed. Then create and push the source tag:
 
 ```bash
-unzip -l dist/AgoraAgentClientToolkit.zip | head
-grep -n "binaryTarget" -A5 dist/Package.swift
-cd dist
-swift package resolve
+git tag source/vX.Y.Z
+git push upstream refs/tags/source/vX.Y.Z
 ```
 
-The zip listing must include:
+Build both package formats from that tagged source in a clean checkout.
+Validate the final binary artifacts and consumer integration before
+publication using the maintainer release process. Publication and the
+SwiftPM distribution tag are separate from the source-tag step.
 
-```text
-AgoraAgentClientToolkit.xcframework/Info.plist
+## Validate the Distribution Artifacts
+
+- CocoaPods: the final spec must declare `agent-client-toolkit-swift` at
+  `X.Y.Z`, module `AgoraAgentClientToolkit`, an accessible binary download,
+  and a matching `vendored_frameworks` path. Inspect the XCFramework's device
+  and simulator slices. The current spec declares `AgoraRtcEngine_iOS >= 4.5.1`
+  and `AgoraRtm/RtmKit >= 2.2.3`.
+- SwiftPM: the package at distribution tag `X.Y.Z` must contain a binary
+  `Package.swift` and the `Sources/AgoraAgentClientToolkitDependencies/`
+  wrapper target. The public product stays `AgoraAgentClientToolkit`. Its
+  binary target must use a real HTTPS URL and SHA-256 checksum, with no
+  unresolved placeholders or local `path:`. The current package pins
+  `AgoraRtcEngine_iOS == 4.5.1` and `AgoraRTM_iOS == 2.2.8`.
+- The SwiftPM download must contain
+  `AgoraAgentClientToolkit.xcframework/Info.plist` at the archive root. Keep
+  the binary archive available at the manifest's URL. The distribution
+  repository contains the manifest and wrapper sources; binaries are
+  downloaded separately.
+
+Compare the checksum of the downloaded archive with the binary manifest:
+
+```bash
+swift package compute-checksum /path/to/AgoraAgentClientToolkit.zip
 ```
 
-## Pre-Publish Checklist
+## Verify the Published Release
 
-1. `CHANGELOG.md` has a release entry for the version being packaged. The first public release must establish the compatibility baseline.
-2. Public API changes in `AgoraAgentClientToolkit/AgoraAgentClientToolkit/Classes/ConversationalAIAPI.swift` and `ConversationalAIAPIImpl.swift` have been reviewed for SemVer impact.
-3. Public README files are aligned with the API surface and contain only developer-facing installation and usage instructions.
-4. The release version is a formal SemVer version.
-5. The same version is used for both CocoaPods and SwiftPM Rehoboam input packages when they are released together.
-6. The staged CocoaPods podspec inside the generated zip has the expected `s.version`.
-7. The CocoaPods zip includes `agent-client-toolkit-swift.podspec` and `AgoraAgentClientToolkit.xcframework`.
-8. The CocoaPods pod name is `agent-client-toolkit-swift`, and the Swift module name is `AgoraAgentClientToolkit`.
-9. CocoaPods dependencies are `AgoraRtcEngine_iOS >= 4.5.1` and `AgoraRtm/RtmKit >= 2.2.3`.
-10. `swiftpm_template/sdk/AgoraAgentClientToolkit/Package.swift` uses `.binaryTarget(name:url:checksum:)` placeholders, not `path:`.
-11. The SwiftPM binary artifact zip generated by Rehoboam contains root `AgoraAgentClientToolkit.xcframework/Info.plist`.
-12. The rewritten SwiftPM binary `Package.swift` contains the artifact URL and SHA-256 checksum, not placeholders and not `path:`.
-13. Rehoboam `swift package resolve` passes from the rewritten SwiftPM binary package directory.
-14. SwiftPM binary dependencies are pinned to `AgoraRtcEngine_iOS == 4.5.1` and `AgoraRTM_iOS == 2.2.8`.
+Verify CocoaPods and SwiftPM separately. The source tag or GitHub Release
+alone is not evidence that both package formats are available.
+
+1. In a clean CocoaPods consumer app, configure the specs source intended for
+   consumers and pin the version:
+
+   ```ruby
+   pod 'agent-client-toolkit-swift', 'X.Y.Z'
+   ```
+
+   Run `pod install --repo-update`, check `Podfile.lock` for the exact version,
+   then build the app and import `AgoraAgentClientToolkit`. Use the published
+   pod instead of the sample's local `:path` dependency.
+
+2. In a separate SwiftPM consumer app, select exact version `X.Y.Z` in Xcode,
+   or declare:
+
+   ```swift
+   .package(url: "https://github.com/AgoraIO/agent-client-toolkit-swift.git", .exact("X.Y.Z"))
+   ```
+
+   Add the `AgoraAgentClientToolkit` product, resolve dependencies, and build
+   the app. Check `Package.resolved`, the binary download, and its checksum.
+   Resolution alone does not verify that the app can compile and link.
+
+3. Repeat the physical-device smoke checks with each published package format.
+   Confirm SDK diagnostics report `X.Y.Z`. Record the source SHA and tag,
+   distribution tag, package versions, and validation results in the release
+   record. If GitHub Releases are created, label source and binary releases
+   clearly and describe each package's actual publication status.

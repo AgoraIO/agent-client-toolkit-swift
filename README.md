@@ -9,6 +9,14 @@ The included UIKit demo uses a local Python FastAPI backend powered by
 iPhone is the primary development path because it provides a representative
 microphone, speaker, echo cancellation, and network experience.
 
+The demo backend's `/get_config`, `/startAgent`, and `/stopAgent` endpoints
+intentionally have no caller authentication. Anyone who can reach them can
+request tokens and start or stop agents. Use the backend only on a trusted
+development LAN, with firewall access limited to your test devices. Do not
+expose it through public port forwarding or tunnels. Add authentication,
+authorization, and abuse controls before using it as a shared or production
+service. See [backend access guidance](./server/README.md#access-boundary).
+
 Prerequisites:
 
 - Python 3.10 or later
@@ -243,4 +251,5 @@ For release notes, see [CHANGELOG.md](./CHANGELOG.md).
 
 ## Maintainers
 
-For CocoaPods / SwiftPM packaging, see [docs/publishing.md](./docs/publishing.md).
+For version preparation, source and distribution tags, and CocoaPods / SwiftPM
+release verification, see [docs/publishing.md](./docs/publishing.md).
