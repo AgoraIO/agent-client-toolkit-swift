@@ -10,12 +10,13 @@ import AgoraRtcKit
 import AgoraRtmKit
 
 @objc public class ConversationalAIAPIImpl: NSObject {
-    public static let version: String = "2.10.0"
+    public static let version: String = "2.10.1"
     private let tag: String = "[ConvoAPI]"
     private let delegates = NSHashTable<ConversationalAIAPIEventHandler>.weakObjects()
     private let config: ConversationalAIAPIConfig
     private var channel: String? = nil
     private var audioRouting = AgoraAudioOutputRouting.default
+    private var enableAins = false
     private var audioScenario: AgoraAudioScenario = .aiClient
     private var stateChangeEvents: [String: StateChangeEvent] = [:]
 
@@ -247,7 +248,12 @@ extension ConversationalAIAPIImpl: ConversationalAIAPI {
     }
 
     @objc public func loadAudioSettings(scenario: AgoraAudioScenario) {
-        callMessagePrint(msg: ">>> [loadAudioSettings] scenario: \(scenario)")
+        loadAudioSettings(scenario: scenario, enableAins: false)
+    }
+
+    @objc public func loadAudioSettings(scenario: AgoraAudioScenario, enableAins: Bool) {
+        callMessagePrint(msg: ">>> [loadAudioSettings] scenario: \(scenario), enableAins: \(enableAins)")
+        self.enableAins = enableAins
         self.config.rtcEngine?.setAudioScenario(scenario)
 
         setAudioConfigParameters(routing: audioRouting)
@@ -639,7 +645,7 @@ extension ConversationalAIAPIImpl {
         }
         audioRouting = routing
         rtcEngine.setParameters("{\"che.audio.aec.split_srate_for_48k\":16000}")
-        rtcEngine.setParameters("{\"che.audio.sf.enabled\":true}")
+        rtcEngine.setParameters("{\"che.audio.sf.enabled\":\(enableAins)}")
         rtcEngine.setParameters("{\"che.audio.sf.stftType\":6}")
         rtcEngine.setParameters("{\"che.audio.sf.ainlpLowLatencyFlag\":1}")
         rtcEngine.setParameters("{\"che.audio.sf.ainsLowLatencyFlag\":1}")

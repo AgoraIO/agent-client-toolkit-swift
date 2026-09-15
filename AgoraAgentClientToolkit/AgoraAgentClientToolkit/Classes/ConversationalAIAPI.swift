@@ -1068,6 +1068,7 @@ public enum MessageType: String, CaseIterable {
     /// Set audio best practice parameters for optimal performance
     /// Configure audio parameters required for optimal performance in AI conversations
     /// Uses default audio scenario (.aiClient)
+    /// Disables on-device AINS. Use loadAudioSettings(scenario:enableAins:) to enable it.
     ///
     /// - Important: If you need to enable audio best practices, you must call this method before each `joinChannel` call
     ///  If you enable Avatar, you MUST use .default for better audio mixing.
@@ -1083,6 +1084,7 @@ public enum MessageType: String, CaseIterable {
     
     /// Set audio best practice parameters with specific scenario
     /// Configure audio parameters required for optimal performance in AI conversations
+    /// Disables on-device AINS. Use loadAudioSettings(scenario:enableAins:) to enable it.
     ///
     /// - Parameter scenario: Audio scenario for optimization (e.g., .aiClient, .meeting, etc.)
     ///   if user enables avatar, please set scenario to .default for better audio mixing.
@@ -1092,6 +1094,16 @@ public enum MessageType: String, CaseIterable {
     ///               - For Avatar: Use .default
     ///              - For standard mode: Use .aiClient
     @objc func loadAudioSettings(scenario: AgoraAudioScenario)
+
+    /// Set audio parameters with caller-controlled on-device AINS.
+    /// The selected AINS value is retained when audio route settings are reapplied.
+    /// Calling an overload without enableAins disables AINS again.
+    ///
+    /// - Parameters:
+    ///   - scenario: Audio scenario. Use .aiClient for standard voice or .default for Avatar.
+    ///   - enableAins: Whether to enable on-device AINS. The overloads without this argument use false.
+    /// - Important: Call before each RTC joinChannel call.
+    @objc func loadAudioSettings(scenario: AgoraAudioScenario, enableAins: Bool)
     
     /// Subscribe to channel messages
     /// Set the channel parameters and callback for message subscription.
