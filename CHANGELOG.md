@@ -32,7 +32,7 @@ Initial public release.
 - Added text and image message publishing through `chat(...)` with `TextMessage` and `ImageMessage`.
 - Added direct conversation control APIs: `interrupt(...)`, `manualSOS(...)`, and `manualEOS(...)`.
 - Added manual turn result callbacks: `onUserManualSosEvent(...)`, `onUserManualEosEvent(...)`, and `onAgentManualEosEvent(...)`.
-- Added maintainer packaging support for Rehoboam CocoaPods and SwiftPM upload input zips.
+- Added maintainer packaging support for CocoaPods and SwiftPM release bundles.
 
 ### Compatibility
 

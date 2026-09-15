@@ -212,37 +212,29 @@ behavior when the backend is delayed or unavailable.
 ## Key Constraints
 
 1. All secrets stay in `server/.env.local`; never print, commit, or return them.
-2. The local backend is a developer quickstart, not a production deployment.
+2. The local backend is a developer quickstart, not a production deployment. Its token and agent lifecycle endpoints have no caller authentication. Restrict access to trusted development devices on the LAN; shared or public deployment requires authentication, authorization, and abuse controls. See [server/README.md](./server/README.md#access-boundary).
 3. `AgoraAgentClientToolkit` remains a read-only dependency for the sample.
 4. Resource cleanup never depends on late RTC/RTM events or backend completion.
 5. Physical-device testing uses the Mac LAN IP, not localhost.
 6. Provider changes must remain server-side and update request-shape tests.
 
-## Internal Rehoboam Release
+## Releases
 
-Rehoboam is the internal release platform for both CocoaPods and SwiftPM. Do not document Rehoboam, Jenkins download URLs, or internal release requests in public-facing README files.
+Follow the canonical checklist in [docs/publishing.md](./docs/publishing.md).
+Keep both podspec versions, both SDK diagnostic version constants, the
+changelog, and affected README examples aligned. Merge release PRs into
+`source/main`; `source/vX.Y.Z` identifies source, while `X.Y.Z` identifies the
+SwiftPM binary distribution on `main`. Never put a distribution tag on a
+source commit or move an existing release tag.
 
-Release strategy:
+Source CI does not publish CocoaPods or SwiftPM packages or create GitHub
+Releases. Its current `tags: ["*"]` filter does not match `source/vX.Y.Z`;
+verify CI on the exact `source/main` commit as described in the checklist.
+Validate CocoaPods and SwiftPM independently with the exact published version.
 
-- Publish only formal SemVer versions; do not publish prerelease or SNAPSHOT versions.
-- Complete package plus sample or clean-app validation before formal publication.
-- If a problem is found after the final version is published, do not overwrite or delete that version; publish a new version such as `2.9.1`.
-
-To prepare the Rehoboam upload zips:
-
-```bash
-VERSION=<version> scripts/build_rehoboam_cocoapods_input_zip.sh
-VERSION=<version> scripts/build_rehoboam_swiftpm_input_zip.sh
-```
-
-The generated zips are:
-
-```text
-build/internal-cocoapods/agora-agent-client-toolkit-<version>-<timestamp>/agora-agent-client-toolkit-<version>-cocoapods-rehoboam-input.zip
-build/internal-spm/agora-agent-client-toolkit-<version>-swiftpm-<timestamp>/agora-agent-client-toolkit-<version>-swiftpm-rehoboam-input.zip
-```
-
-Use the same explicit `VERSION` for CocoaPods and SwiftPM when they are released together. The scripts require a formal SemVer version and reject prerelease or SNAPSHOT versions.
+All tracked documents, including this file, are public. Keep internal
+publishing service details, private URLs, and operational instructions in private
+maintainer documentation.
 
 ## File Naming
 
@@ -258,3 +250,4 @@ Use the same explicit `VERSION` for CocoaPods and SwiftPM when they are released
 | `AGENTS.md` | Development rules and project constraints |
 | `ARCHITECTURE.md` | Runtime ownership and lifecycle |
 | `README.md` | Package integration and demo quick start |
+| `docs/publishing.md` | Version preparation, source tags, and release verification |

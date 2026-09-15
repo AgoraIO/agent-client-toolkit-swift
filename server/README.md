@@ -6,6 +6,25 @@ Fengming STT with managed OpenAI LLM and MiniMax TTS, so no third-party provider
 keys are required. It is a local development service, not a production
 deployment template. Python 3.10 or later is required.
 
+## Access Boundary
+
+`/get_config`, `/startAgent`, and `/stopAgent` have no caller authentication or
+per-user authorization. A reachable caller can obtain user tokens and invoke
+agent lifecycle operations. Keeping the App Certificate on the server does
+not restrict who may call these endpoints.
+
+The physical-device helper listens on `0.0.0.0:8001` so the iPhone can reach
+the Mac over LAN. This binds all network interfaces; use a trusted development
+LAN and limit inbound access to your test devices with a firewall. Do not
+expose the service through public port forwarding or tunnels. Shared or
+production deployments need authentication, authorization, and abuse controls
+such as rate limits.
+
+For testing entirely on the Mac, start FastAPI with `--host 127.0.0.1`.
+Likewise, a Docker container used only from the Mac can publish its port with
+`-p 127.0.0.1:8001:8001`. A physical iPhone needs the Mac's LAN address; it
+cannot reach a service bound only to the Mac's loopback.
+
 ## Configuration
 
 ```bash
