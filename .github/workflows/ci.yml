@@ -4,7 +4,8 @@ on:
   push:
     branches: [source/main]
     tags:
-      - "*"
+      # Source tags build inputs. Distribution tags created by the publisher do not run CI.
+      - "source/**"
   pull_request:
     branches: [source/main]
 
@@ -20,6 +21,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Test release tooling
+        run: python3 -m unittest discover -s scripts/tests
+        working-directory: .
 
       - uses: astral-sh/setup-uv@v5
 
@@ -63,3 +68,75 @@ jobs:
           -destination 'generic/platform=iOS Simulator'
           CODE_SIGNING_ALLOWED=NO
           build
+
+  release-artifacts:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/source/')
+    needs: [server, ios]
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      # Pin the binary build baseline; never silently fall back to the runner default.
+      DEVELOPER_DIR: /Applications/Xcode_16.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate source tag and versions
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(python3 scripts/build_release_artifacts.py "$RELEASE_TAG" --check)
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          xcodebuild -version
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install CocoaPods
+        run: gem install cocoapods -v 1.16.2 --no-document
+
+      - name: Install locked dependencies
+        run: pod _1.16.2_ install --deployment
+
+      - name: Build CocoaPods and SwiftPM release archives
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/build_release_artifacts.py "$RELEASE_TAG"
+
+      - name: Verify binaries with Xcode 16.1
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python3 scripts/verify_xcframework.py \
+            "build/release/$RELEASE_VERSION/AgoraAgentClientToolkit.xcframework" \
+            --output "build/release/$RELEASE_VERSION/validation/xcode-16.1"
+
+      - name: Verify binaries with Xcode 26.3
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python3 scripts/verify_xcframework.py \
+            "build/release/$RELEASE_VERSION/AgoraAgentClientToolkit.xcframework" \
+            --output "build/release/$RELEASE_VERSION/validation/xcode-26.3"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolkit-ios-${{ steps.release.outputs.version }}
+          path: |
+            build/release/${{ steps.release.outputs.version }}/*.zip
+            build/release/${{ steps.release.outputs.version }}/manifest.json
+            build/release/${{ steps.release.outputs.version }}/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload binary validation logs
+        if: always() && steps.release.outputs.version != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolkit-ios-validation-${{ steps.release.outputs.version }}
+          path: build/release/${{ steps.release.outputs.version }}/validation/
+          if-no-files-found: ignore
+          retention-days: 30

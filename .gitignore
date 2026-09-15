@@ -13,6 +13,7 @@ build/
 
 .swiftpm/
 .build/
+__pycache__/
 
 VoiceAgent/Secrets.plist
 Config/VoiceAgent-Local.xcconfig

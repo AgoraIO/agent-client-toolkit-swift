@@ -227,9 +227,12 @@ changelog, and affected README examples aligned. Merge release PRs into
 SwiftPM binary distribution on `main`. Never put a distribution tag on a
 source commit or move an existing release tag.
 
-Source CI does not publish CocoaPods or SwiftPM packages or create GitHub
-Releases. Its current `tags: ["*"]` filter does not match `source/vX.Y.Z`;
-verify CI on the exact `source/main` commit as described in the checklist.
+Source CI builds release inputs only for stable `source/vX.Y.Z` tags after
+source checks pass. It never publishes packages, creates GitHub Releases, or
+pushes tags. Keep the tag trigger restricted to `source/**`; publisher-created
+`X.Y.Z` distribution tags and pushes to binary `main` must not trigger this CI.
+Release artifacts use Xcode 16.1 and are checked with Xcode 16.1 and 26.3;
+do not replace the build toolchain with an unpinned runner default.
 Validate CocoaPods and SwiftPM independently with the exact published version.
 
 All tracked documents, including this file, are public. Keep internal
