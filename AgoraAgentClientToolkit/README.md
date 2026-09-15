@@ -82,6 +82,11 @@ migrate. Use the independent callbacks when multiple activity flags are needed.
 
 Load audio settings before joining RTC, then subscribe to the RTM message channel after RTC/RTM are ready:
 
+Starting with 2.10.1, Toolkit audio settings disable on-device AINS by default.
+Pass `enableAins: true` to enable it. Toolkit retains the selected value when
+audio settings are reapplied after a route change. Calling `loadAudioSettings`
+without `enableAins`, or passing `false`, disables it again.
+
 ```swift
 conversationalAIAPI.loadAudioSettings()
 rtcEngine.joinChannel(byToken: token, channelId: channelName, uid: uid, mediaOptions: options)
@@ -135,6 +140,7 @@ func manualSOS(agentUserId: String, completion: @escaping (String, Conversationa
 func manualEOS(agentUserId: String, completion: @escaping (String, ConversationalAIAPIError?) -> Void)
 func loadAudioSettings()
 func loadAudioSettings(scenario: AgoraAudioScenario)
+func loadAudioSettings(scenario: AgoraAudioScenario, enableAins: Bool)
 func destroy()
 ```
 
@@ -155,6 +161,20 @@ For standard voice mode, use:
 ```swift
 conversationalAIAPI.loadAudioSettings()
 ```
+
+To control AINS from your application, pass its setting before joining:
+
+```swift
+conversationalAIAPI.loadAudioSettings(
+    scenario: .aiClient,
+    enableAins: ainsEnabled // Your application's Boolean setting; false by default.
+)
+```
+
+The existing no-argument and scenario-only methods remain available to Swift
+and Objective-C callers and use `enableAins: false`.
+Update AINS through Toolkit so subsequent audio route changes use the same
+value. Direct RTC parameter writes do not update Toolkit's stored setting.
 
 ## Events
 
