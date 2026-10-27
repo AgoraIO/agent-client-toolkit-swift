@@ -4,7 +4,7 @@ All notable changes to the iOS Agora Conversational AI Toolkit will be documente
 
 The format follows Keep a Changelog style. This first public release establishes the compatibility baseline for future iOS releases.
 
-## [2.10.2] - Unreleased
+## [2.10.2] - 2026-10-27
 
 ### Fixed
 
@@ -22,7 +22,7 @@ The format follows Keep a Changelog style. This first public release establishes
   subtitles. RTM transcripts always set `object`; this fallback only matched
   control events. This matches the Android and Web toolkits.
 
-## [2.10.1] - Unreleased
+## [2.10.1] - 2026-09-15
 
 ### Changed
 
