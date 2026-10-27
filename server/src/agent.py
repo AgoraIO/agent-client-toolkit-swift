@@ -12,7 +12,7 @@ from typing import Any, Mapping
 
 from agora_agent import Area, AsyncAgora
 from agora_agent.agentkit import Agent, generate_convo_ai_token
-from agora_agent.agentkit.vendors import FengmingSTT, MiniMaxTTS, OpenAI
+from agora_agent.agentkit.vendors import AresSTT, MiniMaxTTS, OpenAI
 
 logger = logging.getLogger("voiceagent.backend")
 
@@ -161,7 +161,9 @@ class AgentService:
         sos_mode = validate_turn_detection_mode(start_of_speech_mode)
         eos_mode = validate_turn_detection_mode(end_of_speech_mode)
 
-        stt = FengmingSTT()
+        # The global service (Area.US) accepts the managed "ares" ASR; "fengming" is
+        # rejected outside the Chinese mainland service.
+        stt = AresSTT()
         llm = OpenAI(
             model="gpt-4o-mini",
             system_messages=[

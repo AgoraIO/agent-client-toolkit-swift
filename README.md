@@ -61,7 +61,7 @@ Do not use `localhost` for a physical iPhone because it resolves to the phone
 rather than the Mac. Only Debug builds allow development HTTP for this local
 LAN workflow; Release builds keep the arbitrary-load exception disabled.
 
-The demo explicitly uses Agora Fengming STT with managed OpenAI LLM and MiniMax
+The demo explicitly uses Agora Ares STT with managed OpenAI LLM and MiniMax
 TTS, so the default path does not require third-party provider keys. The iOS app contains
 no App Certificate or provider credentials. The backend generates the user
 RTC + RTM token and starts or stops the agent with the pinned
@@ -87,7 +87,7 @@ Choose one package manager to integrate `AgoraAgentClientToolkit`. Do not integr
 target 'YourApp' do
   use_frameworks!
 
-  pod 'agent-client-toolkit-swift', '2.10.1'
+  pod 'agent-client-toolkit-swift', '2.10.2'
 end
 ```
 
@@ -98,13 +98,13 @@ If your project uses a custom or private CocoaPods specs repository, add that so
 
 ### Swift Package Manager
 
-In Xcode, use `File > Add Package Dependencies...`, enter `https://github.com/AgoraIO/agent-client-toolkit-swift.git`, select version `2.10.1` or later, and add the `AgoraAgentClientToolkit` product to your app target.
+In Xcode, use `File > Add Package Dependencies...`, enter `https://github.com/AgoraIO/agent-client-toolkit-swift.git`, select version `2.10.2` or later, and add the `AgoraAgentClientToolkit` product to your app target.
 
 If you manage dependencies in `Package.swift`, use:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/AgoraIO/agent-client-toolkit-swift.git", from: "2.10.1")
+    .package(url: "https://github.com/AgoraIO/agent-client-toolkit-swift.git", from: "2.10.2")
 ]
 ```
 

@@ -67,7 +67,7 @@ backend also marks successful token responses with `Cache-Control: no-store`.
 ### Python Backend
 
 - Agora App ID and App Certificate
-- explicit Agora Fengming ASR, managed OpenAI `gpt-4o-mini`, and MiniMax
+- explicit Agora Ares ASR, managed OpenAI `gpt-4o-mini`, and MiniMax
   `speech_2_6_turbo` configuration
 - combined user RTC + RTM token generation
 - `agora-agents==2.4.1` client and session lifecycle
@@ -75,7 +75,7 @@ backend also marks successful token responses with `Cache-Control: no-store`.
 - active `agentId` to `AsyncAgentSession` tracking
 - tracked stop plus stateless idempotent fallback
 
-The backend serializes ASR explicitly as `{"vendor":"fengming"}`. OpenAI and
+The backend serializes ASR explicitly as `{"vendor":"ares"}`. OpenAI and
 MiniMax constructors do not receive provider keys, and the SDK converts them to
 the managed preset
 `openai_gpt_4o_mini,minimax_speech_2_6_turbo`. Request-shape tests lock both
