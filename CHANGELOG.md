@@ -4,6 +4,24 @@ All notable changes to the iOS Agora Conversational AI Toolkit will be documente
 
 The format follows Keep a Changelog style. This first public release establishes the compatibility baseline for future iOS releases.
 
+## [2.10.2] - Unreleased
+
+### Fixed
+
+- Only non-empty `assistant.transcription` subtitles now select the transcript
+  render mode or trigger the Words-to-Text fallback. Previously, an RTM control
+  event without an `object` field, such as the `state.listening`,
+  `state.thinking` and `state.speaking` messages, could arrive before the first
+  agent subtitle and switch the session from `.words` to `.text`.
+- Control events no longer enter an already selected renderer. Interrupt events
+  still mark buffered word subtitles as interrupted.
+
+### Changed
+
+- Messages without an `object` field are no longer treated as legacy text
+  subtitles. RTM transcripts always set `object`; this fallback only matched
+  control events. This matches the Android and Web toolkits.
+
 ## [2.10.1] - Unreleased
 
 ### Changed

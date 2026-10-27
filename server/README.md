@@ -2,7 +2,7 @@
 
 This FastAPI service owns the Agora App Certificate, user token generation, and
 Conversational AI agent lifecycle for the iOS demo. It explicitly uses Agora
-Fengming STT with managed OpenAI LLM and MiniMax TTS, so no third-party provider
+Ares STT with managed OpenAI LLM and MiniMax TTS, so no third-party provider
 keys are required. It is a local development service, not a production
 deployment template. Python 3.10 or later is required.
 

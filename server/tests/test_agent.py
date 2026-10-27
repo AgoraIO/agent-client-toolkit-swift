@@ -230,7 +230,7 @@ async def test_start_builds_real_sdk_agent_and_preserves_contract(
         "end_of_speech": {"mode": "manual"},
     }
     assert properties["asr"] == {
-        "vendor": "fengming",
+        "vendor": "ares",
         "language": "en-US",
     }
     assert properties["llm"]["system_messages"] == [

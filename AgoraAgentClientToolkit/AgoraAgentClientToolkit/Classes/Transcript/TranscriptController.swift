@@ -146,7 +146,7 @@ extension TranscriptDelegate {
 /// Manages the processing and rendering of transcript in conversation
 ///
 @objc public class TranscriptController: NSObject {
-    public static let version: String = "2.10.1"
+    public static let version: String = "2.10.2"
     static let tag = "[Transcript]"
     static let uiTag = "[Transcript-UI]"
 
@@ -207,6 +207,10 @@ extension TranscriptDelegate {
             self.callMessagePrint(tag: TranscriptController.tag, msg: "<<< [onInterrupted], pts: \(self.audioTimestamp), \(agentUserId), \(message), \(interruptedEvent) ")
             self.delegate?.onInterrupted(agentUserId: agentUserId, event: interruptedEvent)
             lastInterruptEvent = interruptedEvent
+            if renderMode == .words {
+                handleWordsMessage(message)
+            }
+            return
         }
         
         if message.object == MessageType.user.rawValue {
@@ -234,11 +238,16 @@ extension TranscriptDelegate {
     }
     
     private func getMessageMode(_ message: TranscriptMessage) -> TranscriptRenderMode? {
+        // Only agent subtitles select, downgrade or enter a renderer. Control events such as
+        // `state.listening` carry `event_type` without `object` and must not change the mode.
+        guard message.object == MessageType.assistant.rawValue else {
+            return nil
+        }
         if let mode = renderMode {
             return mode
         }
-        let messageType = MessageType(rawValue: message.object ?? "string") ?? .unknown
-        guard messageType == .string || messageType == .assistant else {
+        // An empty initial subtitle does not establish whether word data is supported.
+        guard let text = message.text, !text.isEmpty else {
             return nil
         }
         if renderConfig?.renderMode == .words {
