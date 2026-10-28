@@ -23,8 +23,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "AgoraAgentClientToolkit",
-            url: "https://download.agora.io/swiftpm/agent-client-toolkit-swift/2.10.1/AgoraAgentClientToolkit.xcframework.zip",
-            checksum: "a1de265c4c573ee276091db798e2844bdc8eee25abac35af9891aac88368f5a4"
+            url: "https://download.agora.io/swiftpm/agent-client-toolkit-swift/2.10.2/AgoraAgentClientToolkit.xcframework.zip",
+            checksum: "e291a5cf75262e8b7d169ea98c2c0280b419be304940bbe3c64454e3660557d5"
         ),
         .target(
             name: "AgoraAgentClientToolkitDependencies",
