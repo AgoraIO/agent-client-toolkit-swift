@@ -4,6 +4,16 @@ All notable changes to the iOS Agora Conversational AI Toolkit will be documente
 
 The format follows Keep a Changelog style. This first public release establishes the compatibility baseline for future iOS releases.
 
+## [2.11.0] - Unreleased
+
+### Fixed
+
+- Word render mode no longer drops a word whose `start_ms` equals an already
+  kept word with different text, such as a zero-duration word rounded by
+  Cartesia TTS. Duplicates are now identified by word text plus `start_ms`.
+- Words merged after an interrupt now inherit the interrupted status, matching
+  Android.
+
 ## [2.10.2] - 2026-10-27
 
 ### Fixed

@@ -87,7 +87,7 @@ Choose one package manager to integrate `AgoraAgentClientToolkit`. Do not integr
 target 'YourApp' do
   use_frameworks!
 
-  pod 'agent-client-toolkit-swift', '2.10.2'
+  pod 'agent-client-toolkit-swift', '2.11.0'
 end
 ```
 
@@ -98,13 +98,13 @@ If your project uses a custom or private CocoaPods specs repository, add that so
 
 ### Swift Package Manager
 
-In Xcode, use `File > Add Package Dependencies...`, enter `https://github.com/AgoraIO/agent-client-toolkit-swift.git`, select version `2.10.2` or later, and add the `AgoraAgentClientToolkit` product to your app target.
+In Xcode, use `File > Add Package Dependencies...`, enter `https://github.com/AgoraIO/agent-client-toolkit-swift.git`, select version `2.11.0` or later, and add the `AgoraAgentClientToolkit` product to your app target.
 
 If you manage dependencies in `Package.swift`, use:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/AgoraIO/agent-client-toolkit-swift.git", from: "2.10.2")
+    .package(url: "https://github.com/AgoraIO/agent-client-toolkit-swift.git", from: "2.11.0")
 ]
 ```
 
