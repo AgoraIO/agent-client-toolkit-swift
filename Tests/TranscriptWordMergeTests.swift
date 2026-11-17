@@ -194,9 +194,7 @@ private func testU4bChineseUpdateMessageKeepsSameStartWords() {
     expectWords(merge(step1, second), step1 + [w("白", 1270)], "U4b step 2: only 白@1270 is added")
 }
 
-private func testU7SameKeyFirstSeenInLaterMessageIsStillDropped() {
-    // Known gap 3.10 (Cartesia log.1 lines 4119 -> 4121): the space after me@6663 has the same key
-    // as the kept ␠@6662 and is dropped. 3.11: spaces keep their start_ms order.
+private func testU7DuplicateSpaceWithSameTimestampIsDeduplicated() {
     let kept = [w("Let", 6380), sp(6662), w("me", 6663)]
     let incoming = [w("Let", 6380), sp(6662), w("me", 6663), sp(6662), w("try", 6744)]
     expect(!isBugCondition([kept, incoming]), "U7 input must be outside the bug condition")
@@ -894,7 +892,7 @@ private struct TranscriptWordMergeTests {
             ("u3", testU3OverlappingResendAddsOnlyNewWords),
             ("u4a", testU4aChineseFirstMessageKeepsSameStartWords),
             ("u4b", testU4bChineseUpdateMessageKeepsSameStartWords),
-            ("u7", testU7SameKeyFirstSeenInLaterMessageIsStillDropped),
+            ("u7", testU7DuplicateSpaceWithSameTimestampIsDeduplicated),
             ("plain-windows", testPlainOverlappingWindowsRestoreSequence),
             ("generated-preservation", testGeneratedNonBugSequencesMatchReferenceMerge),
             ("property3-overlapping-windows", testProperty3OverlappingWindowsRestoreReference),

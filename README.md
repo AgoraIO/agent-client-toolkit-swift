@@ -21,14 +21,14 @@ Prerequisites:
 
 - Python 3.10 or later
 - Xcode 16.0 or later for the included VoiceAgent demo
-- CocoaPods
+- CocoaPods 1.16.2
 - a Mac and physical iPhone running iOS 15.0 or later on the same LAN
 - an Agora project with RTC, RTM, and Conversational AI enabled
 
 Install the iOS demo dependencies from the repository root:
 
 ```bash
-pod install
+pod _1.16.2_ install
 ```
 
 Configure the backend:
@@ -44,7 +44,7 @@ Set `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE` from your Agora project in
 ./scripts/start_backend.sh
 ```
 
-On first use, the script creates `server/.venv` and installs the pinned Python
+On first use, the script creates `server/.venv` and installs the required Python
 dependencies. It starts FastAPI on `0.0.0.0:8001` by default, detects the Mac's
 active LAN IP, waits for `/health`, and writes only the backend address to the
 Git-ignored `Config/VoiceAgent-Local.xcconfig`.
@@ -64,8 +64,8 @@ LAN workflow; Release builds keep the arbitrary-load exception disabled.
 The demo explicitly uses Agora Ares STT with managed OpenAI LLM and MiniMax
 TTS, so the default path does not require third-party provider keys. The iOS app contains
 no App Certificate or provider credentials. The backend generates the user
-RTC + RTM token and starts or stops the agent with the pinned
-`agora-agents==2.4.1` SDK. This repository does not provide a hosted backend,
+RTC + RTM token and starts or stops the agent with
+`agora-agents>=2.14.0`. This repository does not provide a hosted backend,
 shared account, TestFlight build, or maintained prebuilt app. See
 [ARCHITECTURE.md](./ARCHITECTURE.md) for the runtime sequence and ownership
 boundaries.

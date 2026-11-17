@@ -1,4 +1,4 @@
-agora-agents==2.4.1
+agora-agents>=2.14.0
 fastapi==0.116.1
 pydantic>=2.10,<3
 python-dotenv==1.1.1

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from agora_agent import Area
 from agora_agent.agentkit import Agent
 
 import src.agent as agent_module
@@ -129,6 +130,7 @@ def test_sdk_timeout_finishes_before_mobile_timeout(
     monkeypatch.setattr(agent_module, "AsyncAgora", fake_async_agora)
     AgentService(settings)
 
+    assert captured["area"] is Area.US
     assert captured["timeout"] == SDK_REQUEST_TIMEOUT_SECONDS
     assert SDK_REQUEST_TIMEOUT_SECONDS < 30
 

@@ -17,3 +17,16 @@ target 'VoiceAgent' do
   pod 'AgoraRtm', '2.2.3', :subspecs => ['RtmKit']
   pod 'SnapKit'
 end
+
+post_install do |installer|
+  minimum_ios_version = Gem::Version.new('15.0')
+
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |configuration|
+      deployment_target = configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+      if deployment_target && Gem::Version.new(deployment_target) < minimum_ios_version
+        configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = minimum_ios_version.to_s
+      end
+    end
+  end
+end

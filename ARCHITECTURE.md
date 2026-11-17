@@ -70,7 +70,7 @@ backend also marks successful token responses with `Cache-Control: no-store`.
 - explicit Agora Ares ASR, managed OpenAI `gpt-4o-mini`, and MiniMax
   `speech_2_6_turbo` configuration
 - combined user RTC + RTM token generation
-- `agora-agents==2.4.1` client and session lifecycle
+- `agora-agents>=2.14.0` client and session lifecycle
 - agent RTC credential and REST authentication generation inside the SDK
 - active `agentId` to `AsyncAgentSession` tracking
 - tracked stop plus stateless idempotent fallback

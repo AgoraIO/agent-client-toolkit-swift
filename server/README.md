@@ -6,6 +6,10 @@ Ares STT with managed OpenAI LLM and MiniMax TTS, so no third-party provider
 keys are required. It is a local development service, not a production
 deployment template. Python 3.10 or later is required.
 
+The backend uses an overseas Agora project and `Area.US`. Keep Ares as the
+ASR vendor for this global service; the Chinese mainland `fengming` vendor
+cannot be used with it.
+
 ## Access Boundary
 
 `/get_config`, `/startAgent`, and `/stopAgent` have no caller authentication or
@@ -32,8 +36,8 @@ cp server/.env.example server/.env.local
 ```
 
 Set `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE` in `server/.env.local`.
-`AGENT_PROMPT` and `AGENT_GREETING` are optional copy settings. The backend pins
-`agora-agents==2.4.1`. `PORT` is optional and defaults to `8001`.
+`AGENT_PROMPT` and `AGENT_GREETING` are optional copy settings. The backend requires
+`agora-agents>=2.14.0`. `PORT` is optional and defaults to `8001`.
 
 ## Start
 
@@ -43,7 +47,7 @@ From the repository root, run:
 ./scripts/start_backend.sh
 ```
 
-The script creates `server/.venv`, installs the pinned requirements, starts the
+The script creates `server/.venv`, installs the required dependencies, starts the
 service on `0.0.0.0:8001` by default, detects the Mac LAN IP, and configures the
 ignored iOS `Config/VoiceAgent-Local.xcconfig`. The iPhone and Mac must use the
 same LAN.
