@@ -62,7 +62,8 @@ rather than the Mac. Only Debug builds allow development HTTP for this local
 LAN workflow; Release builds keep the arbitrary-load exception disabled.
 
 The demo explicitly uses Agora Ares STT with managed OpenAI LLM and MiniMax
-TTS, so the default path does not require third-party provider keys. The iOS app contains
+TTS by default. To validate Cartesia BYOK, set `AGENT_TTS_VENDOR=cartesia` and
+`CARTESIA_API_KEY` in `server/.env.local`. The iOS app contains
 no App Certificate or provider credentials. The backend generates the user
 RTC + RTM token and starts or stops the agent with
 `agora-agents>=2.14.0`. This repository does not provide a hosted backend,
