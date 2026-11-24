@@ -25,3 +25,9 @@ swiftc \
   "${ROOT_DIR}/Tests/SpeakThinkMessageTests.swift" \
   -o "${BUILD_DIR}/speak-think-message-tests"
 "${BUILD_DIR}/speak-think-message-tests"
+
+swiftc \
+  "${ROOT_DIR}/AgoraAgentClientToolkit/AgoraAgentClientToolkit/Classes/Transcript/TranscriptWordMerge.swift" \
+  "${ROOT_DIR}/Tests/TranscriptWordMergeTests.swift" \
+  -o "${BUILD_DIR}/transcript-word-merge-tests"
+"${BUILD_DIR}/transcript-word-merge-tests"

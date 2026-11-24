@@ -2,9 +2,13 @@
 
 This FastAPI service owns the Agora App Certificate, user token generation, and
 Conversational AI agent lifecycle for the iOS demo. It explicitly uses Agora
-Ares STT with managed OpenAI LLM and MiniMax TTS, so no third-party provider
-keys are required. It is a local development service, not a production
-deployment template. Python 3.10 or later is required.
+Ares STT with managed OpenAI LLM and MiniMax TTS by default. Cartesia BYOK TTS
+is optional for demo validation. It is a local development service, not a
+production deployment template. Python 3.10 or later is required.
+
+The backend uses an overseas Agora project and `Area.US`. Keep Ares as the
+ASR vendor for this global service; the Chinese mainland `fengming` vendor
+cannot be used with it.
 
 ## Access Boundary
 
@@ -32,8 +36,29 @@ cp server/.env.example server/.env.local
 ```
 
 Set `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE` in `server/.env.local`.
-`AGENT_PROMPT` and `AGENT_GREETING` are optional copy settings. The backend pins
-`agora-agents==2.4.1`. `PORT` is optional and defaults to `8001`.
+Keep the Agent configuration copied from `.env.example`; values are read
+directly from the environment without built-in defaults.
+The default `AGENT_TTS_VENDOR=minimax` does not require a third-party key.
+To use Cartesia, set `AGENT_TTS_VENDOR=cartesia` and `CARTESIA_API_KEY`, keeping
+`CARTESIA_VOICE_ID` and `CARTESIA_MODEL_ID` configured in the same file.
+`AGENT_PROMPT`, `AGENT_GREETING`, and `AGENT_FAILURE_MESSAGE` configure Agent copy.
+The backend requires `agora-agents>=2.14.0`. `PORT` is optional and defaults to `8001`.
+
+For custom Agora API routing, optionally set `AGORA_AGENTS_API_BASE_URL` to
+the service origin and any path prefix. The SDK appends
+`/api/conversational-ai-agent` automatically. Set
+`AGORA_AGENTS_SERVICE_NAMESPACE` to add an `X-Service-Namespace` header to
+Agent start and stop requests. Empty values use the default global endpoint
+and omit the namespace header. These settings configure the backend's
+upstream API requests; the iOS app still connects to the local backend.
+Restart the backend after changing them.
+
+SDK HTTP debug logging is enabled for this local backend. Its terminal output
+includes the actual request method, URL, headers and JSON body, plus response
+status and headers. The SDK redacts credentials and limits request body logs
+to 2000 characters.
+Agent start failures also log the upstream status, request ID, and redacted
+SDK response body. The HTTP response sent to the app keeps its safe message.
 
 ## Start
 
@@ -43,7 +68,7 @@ From the repository root, run:
 ./scripts/start_backend.sh
 ```
 
-The script creates `server/.venv`, installs the pinned requirements, starts the
+The script creates `server/.venv`, installs the required dependencies, starts the
 service on `0.0.0.0:8001` by default, detects the Mac LAN IP, and configures the
 ignored iOS `Config/VoiceAgent-Local.xcconfig`. The iPhone and Mac must use the
 same LAN.

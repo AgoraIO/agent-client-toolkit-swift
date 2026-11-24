@@ -146,7 +146,7 @@ extension TranscriptDelegate {
 /// Manages the processing and rendering of transcript in conversation
 ///
 @objc public class TranscriptController: NSObject {
-    public static let version: String = "2.10.2"
+    public static let version: String = "2.11.0"
     static let tag = "[Transcript]"
     static let uiTag = "[Transcript-UI]"
 
@@ -344,11 +344,17 @@ extension TranscriptDelegate {
                 if let words = message.words, !words.isEmpty
                 {
                     let bufferWords = curBuffer.words
-                    let uniqueWords = words.filter { newWord in
-                        return !bufferWords.contains { firstWord in firstWord.start_ms == newWord.start_ms}
+                    // parse first; entries without word or start_ms are dropped
+                    let incoming = words.compactMap { word -> TurnWordInfo? in
+                        guard let wordText = word.word, let startTime = word.start_ms else {
+                            return nil
+                        }
+                        return TurnWordInfo(text: wordText,
+                                       start_ms: startTime)
                     }
-                    // if diffrent ms words received, add new words to buffer
-                    if !uniqueWords.isEmpty
+                    let addWords = TranscriptWordMerge.newWords(incoming, kept: bufferWords, text: { $0.text }, startMs: { $0.start_ms })
+                    // if new words received, add them to buffer
+                    if !addWords.isEmpty
                     {
                         // if the last message is final sign, reset it
                         if var lastWord = bufferWords.last, (lastWord.status == .end)
@@ -357,17 +363,10 @@ extension TranscriptDelegate {
                             curBuffer.words.removeLast()
                             curBuffer.words.append(lastWord)
                         }
-                        // add new words to buffer and resort
-                        let addWords = uniqueWords.compactMap { word -> TurnWordInfo? in
-                            guard let wordText = word.word, let startTime = word.start_ms else {
-                                return nil
-                            }
-                            return TurnWordInfo(text: wordText,
-                                           start_ms: startTime)
-                        }
-                        curBuffer.words.append(contentsOf: addWords)
-                        // sort words by timestamp
-                        curBuffer.words.sort { $0.start_ms < $1.start_ms }
+                        // add new words to buffer and sort words by timestamp
+                        curBuffer.words = TranscriptWordMerge.merged(kept: curBuffer.words, newWords: addWords, startMs: { $0.start_ms })
+                        // words after the first interrupted word inherit the interrupt
+                        TranscriptWordMerge.inheritInterrupted(&curBuffer.words, isInterrupted: { $0.status == .interrupted }, markInterrupted: { $0.status = .interrupted })
                     }
                 }
                 // if the message state is end, sign last word finished

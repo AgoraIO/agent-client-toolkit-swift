@@ -67,19 +67,19 @@ backend also marks successful token responses with `Cache-Control: no-store`.
 ### Python Backend
 
 - Agora App ID and App Certificate
-- explicit Agora Ares ASR, managed OpenAI `gpt-4o-mini`, and MiniMax
-  `speech_2_6_turbo` configuration
+- explicit Agora Ares ASR, managed OpenAI `gpt-4o-mini`, and default managed
+  MiniMax TTS, with optional Cartesia BYOK
 - combined user RTC + RTM token generation
-- `agora-agents==2.4.1` client and session lifecycle
+- `agora-agents>=2.14.0` client and session lifecycle
 - agent RTC credential and REST authentication generation inside the SDK
 - active `agentId` to `AsyncAgentSession` tracking
 - tracked stop plus stateless idempotent fallback
 
-The backend serializes ASR explicitly as `{"vendor":"ares"}`. OpenAI and
-MiniMax constructors do not receive provider keys, and the SDK converts them to
-the managed preset
-`openai_gpt_4o_mini,minimax_speech_2_6_turbo`. Request-shape tests lock both
-forms and verify that third-party credential fields are absent.
+The backend serializes ASR explicitly as `{"vendor":"ares"}`. OpenAI uses
+the managed `openai_gpt_4o_mini` preset. TTS defaults to managed MiniMax.
+Set `AGENT_TTS_VENDOR=cartesia` to use a BYOK key from Git-ignored
+`server/.env.local`. Request-shape tests lock the ASR vendor, managed presets,
+and both TTS payloads.
 
 ## Startup Sequence
 

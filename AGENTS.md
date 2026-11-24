@@ -15,7 +15,7 @@ backend, shared credentials, TestFlight build, or prebuilt app.
 
 The iOS client owns RTC, RTM, Toolkit, UI, and immediate local cleanup. The
 FastAPI service under `server/` owns all secrets, combined user token
-generation, and agent lifecycle operations through `agora-agents==2.4.1`.
+generation, and agent lifecycle operations through `agora-agents>=2.14.0`.
 
 Current demo scope includes startup-time independent SOS/EOS selection,
 transcript and latency rendering, agent state, interrupt, text, image URL,
@@ -30,8 +30,8 @@ speak and think messages, manual SOS/EOS, mute, and stop.
 | RTC | `AgoraRtcEngine_iOS` 4.5.1 |
 | RTM | `AgoraRtm/RtmKit` 2.2.3 |
 | Toolkit | local CocoaPods pod `agent-client-toolkit-swift` |
-| Backend | Python 3.10+, FastAPI, `agora-agents==2.4.1` |
-| Providers | Agora Ares STT + managed OpenAI LLM + MiniMax TTS |
+| Backend | Python 3.10+, FastAPI, `agora-agents>=2.14.0` |
+| Providers | Agora Ares STT + managed OpenAI LLM + MiniMax TTS; optional Cartesia BYOK |
 
 ## Core Modules
 
@@ -75,7 +75,7 @@ speak and think messages, manual SOS/EOS, mute, and stop.
 
 - `server/src/server.py` defines the FastAPI envelope and routes.
 - `server/src/agent.py` validates environment configuration, creates one
-  `AsyncAgora` client, builds the Ares/OpenAI/MiniMax Agent, and
+  `AsyncAgora` client, builds the configured Agent, and
   tracks active `AsyncAgentSession` values by `agentId`.
 - User config contains a combined RTC + RTM token generated on the server.
 - Successful `/get_config` responses use `Cache-Control: no-store`.
@@ -87,10 +87,12 @@ speak and think messages, manual SOS/EOS, mute, and stop.
   also safe for the Android quickstart.
 - Stop uses a tracked session first and `AsyncAgora.stop_agent()` as an
   idempotent stateless fallback.
+- The demo uses an overseas Agora project with `AsyncAgora(area=Area.US)`.
 - Ares ASR is explicit and has no provider parameters. The global service
-  rejects the Chinese mainland `fengming` vendor. OpenAI and MiniMax
-  constructors do not receive provider keys. Request-shape tests lock the ASR
-  vendor, managed LLM/TTS preset, and absence of third-party credentials.
+  rejects the Chinese mainland `fengming` vendor. OpenAI and default MiniMax
+  TTS use managed presets. Optional Cartesia TTS uses a BYOK key kept in
+  Git-ignored `server/.env.local`.
+  Request-shape tests lock the ASR vendor, LLM preset, and TTS payload.
 
 ### AgoraAgentClientToolkit
 
@@ -158,8 +160,13 @@ HTTP; Release does not include the ATS arbitrary-load exception.
 |-------|---------|
 | `AGORA_APP_ID` | Agora project App ID |
 | `AGORA_APP_CERTIFICATE` | Server-side token signing |
+| `AGENT_TTS_VENDOR` | Required; `minimax` in the env template, or `cartesia` |
+| `CARTESIA_API_KEY` | Required only for Cartesia BYOK |
+| `CARTESIA_VOICE_ID` | Required only for Cartesia; read from env |
+| `CARTESIA_MODEL_ID` | Required only for Cartesia; read from env |
 | `AGENT_PROMPT` | Optional system prompt |
 | `AGENT_GREETING` | Optional initial greeting |
+| `AGENT_FAILURE_MESSAGE` | Optional LLM failure message |
 | `PORT` | Optional local FastAPI port; defaults to `8001` |
 
 To switch providers, change `server/src/agent.py`, `server/.env.example`, and
